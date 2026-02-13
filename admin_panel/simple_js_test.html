@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JS Test</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>JavaScript Test</h1>
+    <p id="status">Initial: Waiting...</p>
+    <p id="debug">Debug info will appear here</p>
+    
+    <script>
+        console.log('TEST: Script started');
+        document.getElementById('status').textContent = 'Script executed!';
+        document.getElementById('debug').textContent = 'JavaScript is working at ' + new Date().toLocaleTimeString();
+    </script>
+</body>
+</html>

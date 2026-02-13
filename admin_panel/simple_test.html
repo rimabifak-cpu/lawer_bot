@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Law Bot</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        h2 { color: #555; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-top: 30px; }
+        .section { margin-bottom: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .nav-links { margin-bottom: 20px; padding: 15px; background: #007bff; border-radius: 8px; }
+        .nav-links a { color: white; text-decoration: none; margin-right: 20px; font-weight: bold; }
+        .nav-links a:hover { text-decoration: underline; }
+        .btn { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .btn-details { padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .btn-details:hover { background: #218838; }
+        
+        /* Modal styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 800px; border-radius: 8px; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 20px; }
+        .modal-close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .modal-close:hover { color: #000; }
+        .detail-row { margin-bottom: 15px; }
+        .detail-label { font-weight: bold; color: #555; }
+        .detail-value { margin-top: 5px; padding: 8px; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>📋 Admin Panel - Law Bot</h1>
+    
+    <div class="nav-links">
+        <span>📁 Навигация:</span>
+        <a href="/test">🏠 Главная</a>
+        <a href="/dialogs">💬 Диалоги с пользователями</a>
+    </div>
+    
+    <p>Дата и время загрузки: <span id="load-time"></span></p>
+    
+    <div class="section">
+        <h2>Пользователи и рефералы</h2>
+        <table id="users-referrals-table">
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Логин</th>
+                    <th>Кто его пригласил (Реферал)</th>
+                    <th>Количество рефералов</th>
+                </tr>
+            </thead>
+            <tbody id="users-referrals-body">
+                <tr><td colspan="4">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Анкеты дел (API: /api/requests)</h2>
+        <table id="requests-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Предмет спора</th>
+                    <th>Статус</th>
+                    <th>Дата отправки</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody id="requests-body">
+                <tr><td colspan="6">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Партнёры (API: /api/partners)</h2>
+        <table id="partners-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>ФИО</th>
+                    <th>Компания</th>
+                    <th>Email</th>
+                </tr>
+            </thead>
+            <tbody id="partners-body">
+                <tr><td colspan="4">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Отправить сообщение пользователю</h2>
+        <form id="direct-message-form">
+            <select id="user-select" style="padding: 8px; margin-right: 10px;">
+                <option value="">Загрузка...</option>
+            </select>
+            <input type="text" id="message-text" placeholder="Текст сообщения" style="padding: 8px; width: 300px; margin-right: 10px;">
+            <button type="submit" class="btn">Отправить</button>
+        </form>
+        <p id="send-result"></p>
+    </div>
+    
+    <div class="section">
+        <h2>Отладочная информация</h2>
+        <pre id="debug-info" style="background: #f5f5f5; padding: 10px; overflow-x: auto;"></pre>
+    </div>
+
+    <script>
+        // Устанавливаем время загрузки
+        document.getElementById('load-time').textContent = new Date().toLocaleString();
+        
+        // Глобальная переменная для хранения всех анкет
+        let allRequests = [];
+        
+        // Загрузка списка пользователей для select
+        async function loadUsersList() {
+            const select = document.getElementById('user-select');
+            try {
+                const response = await fetch('/api/users/list');
+                const users = await response.json();
+                
+                select.innerHTML = '<option value="">Выберите пользователя...</option>';
+                
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.telegram_id;
+                    option.textContent = user.display_name;
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                select.innerHTML = '<option value="">Ошибка загрузки</option>';
+                console.error('Ошибка загрузки пользователей:', e);
+            }
+        }
+        
+        // Обработчик формы отправки сообщения
+        document.getElementById('direct-message-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const telegramId = document.getElementById('user-select').value;
+            const message = document.getElementById('message-text').value;
+            const resultEl = document.getElementById('send-result');
+            
+            if (!telegramId) {
+                resultEl.textContent = '❌ Выберите пользователя';
+                resultEl.style.color = 'red';
+                return;
+            }
+            
+            resultEl.textContent = 'Отправка...';
+            
+            try {
+                const response = await fetch('/api/messages/direct', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        telegram_id: parseInt(telegramId),
+                        message: message
+                    })
+                });
+                
+                if (response.ok) {
+                    resultEl.textContent = '✅ Сообщение отправлено!';
+                    resultEl.style.color = 'green';
+                } else {
+                    const error = await response.json();
+                    resultEl.textContent = '❌ Ошибка: ' + (error.detail || 'Неизвестная ошибка');
+                    resultEl.style.color = 'red';
+                }
+            } catch (e) {
+                resultEl.textContent = '❌ Ошибка: ' + e.message;
+                resultEl.style.color = 'red';
+            }
+        });
+        
+        // Загружаем список пользователей при загрузке страницы
+        loadUsersList();
+        
+        // Функция для показа деталей дела
+        function showCaseDetails(requestId) {
+            const req = allRequests.find(r => r.id === requestId);
+            if (!req) {
+                alert('Заявка не найдена');
+                return;
+            }
+            
+            const modal = document.getElementById('case-details-modal');
+            const content = document.getElementById('case-details-content');
+            
+            const userInfo = req.user ? `${req.user.first_name || ''} ${req.user.last_name || ''} (@${req.user.username || 'нет'})` : 'N/A';
+            
+            content.innerHTML = `
+                <div class="detail-row"><div class="detail-label">ID заявки:</div><div class="detail-value">${req.id}</div></div>
+                <div class="detail-row"><div class="detail-label">Клиент:</div><div class="detail-value">${userInfo}</div></div>
+                <div class="detail-row"><div class="detail-label">Статус:</div><div class="detail-value">${req.status}</div></div>
+                <div class="detail-row"><div class="detail-label">Дата создания:</div><div class="detail-value">${req.created_at ? new Date(req.created_at).toLocaleString() : '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Дата отправки:</div><div class="detail-value">${req.sent_at ? new Date(req.sent_at).toLocaleString() : '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Стороны (истец/ответчик):</div><div class="detail-value">${req.parties_info || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Предмет спора:</div><div class="detail-value">${req.dispute_subject || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Правовое обоснование:</div><div class="detail-value">${req.legal_basis || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Хронология событий:</div><div class="detail-value">${req.chronology || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Доказательства:</div><div class="detail-value">${req.evidence || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Процессуальная история:</div><div class="detail-value">${req.procedural_history || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Цель клиента:</div><div class="detail-value">${req.client_goal || '-'}</div></div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('case-details-modal').style.display = 'none';
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('case-details-modal');
+            if (event.target === modal) modal.style.display = 'none';
+        }
+        
+        // Загружаем данные через fetch
+        async function loadData() {
+            const debug = [];
+            
+            try {
+                // Загружаем анкеты
+                debug.push('Загрузка анкет...');
+                const requestsRes = await fetch('/api/requests');
+                debug.push('Статус ответа анкет: ' + requestsRes.status);
+                allRequests = await requestsRes.json();
+                debug.push('Получено анкет: ' + allRequests.length);
+                
+                let requestsHtml = '';
+                if (allRequests.length === 0) {
+                    requestsHtml = '<tr><td colspan="6">Нет анкет</td></tr>';
+                } else {
+                    for (const req of allRequests) {
+                        const client = req.user ? req.user.first_name : 'N/A';
+                        const subject = (req.dispute_subject || '-').substring(0, 30);
+                        const status = req.status;
+                        const date = req.sent_at ? new Date(req.sent_at).toLocaleString() : '-';
+                        requestsHtml += `<tr><td>${req.id}</td><td>${client}</td><td>${subject}...</td><td>${status}</td><td>${date}</td><td><button class="btn-details" onclick="showCaseDetails(${req.id})">Подробнее</button></td></tr>`;
+                    }
+                }
+                document.getElementById('requests-body').innerHTML = requestsHtml;
+                
+                // Загружаем партнёров
+                debug.push('');
+                debug.push('Загрузка партнёров...');
+                const partnersRes = await fetch('/api/partners');
+                debug.push('Статус ответа партнёров: ' + partnersRes.status);
+                const partners = await partnersRes.json();
+                debug.push('Получено партнёров: ' + partners.length);
+                
+                let partnersHtml = '';
+                if (partners.length === 0) {
+                    partnersHtml = '<tr><td colspan="4">Нет партнёров</td></tr>';
+                } else {
+                    for (const p of partners) {
+                        partnersHtml += `<tr><td>${p.id}</td><td>${p.full_name}</td><td>${p.company_name}</td><td>${p.email}</td></tr>`;
+                    }
+                }
+                document.getElementById('partners-body').innerHTML = partnersHtml;
+                
+                // Загружаем пользователей и рефералов
+                debug.push('');
+                debug.push('Загрузка пользователей и рефералов...');
+                const usersRes = await fetch('/api/users/referrals-info');
+                debug.push('Статус ответа пользователей: ' + usersRes.status);
+                const usersResponse = await usersRes.json();
+                const usersData = usersResponse.users || usersResponse;
+                debug.push('Получено пользователей: ' + usersData.length);
+                
+                let usersHtml = '';
+                if (usersData.length === 0) {
+                    usersHtml = '<tr><td colspan="4">Нет пользователей</td></tr>';
+                } else {
+                    for (const u of usersData) {
+                        const referrer = u.invited_by ? (u.invited_by.name || 'Неизвестно') : '-';
+                        const refCount = u.invited_count || 0;
+                        usersHtml += `<tr><td>${u.name}</td><td>${u.username || '-'}</td><td>${referrer}</td><td>${refCount}</td></tr>`;
+                    }
+                }
+                document.getElementById('users-referrals-body').innerHTML = usersHtml;
+                
+            } catch (e) {
+                debug.push('Ошибка: ' + e.message);
+            }
+            
+            // Показываем отладочную информацию
+            document.getElementById('debug-info').textContent = debug.join('\n');
+        }
+        
+        // Запускаем загрузку
+        loadData();
+    </script>
+    
+    <!-- Modal for case details -->
+    <div id="case-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Детали заявки</h2>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="case-details-content"></div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест админ-панели</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        h2 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Тест админ-панели</h1>
+    
+    <h2>Анкеты дел</h2>
+    <div id="requests-container">Загрузка...</div>
+    
+    <h2>Партнёры</h2>
+    <div id="partners-container">Загрузка...</div>
+    
+    <script>
+        async function loadData() {
+            // Загрузка анкет
+            try {
+                const requestsResponse = await fetch('/api/requests');
+                const requests = await requestsResponse.json();
+                
+                let requestsHtml = '<table><thead><tr><th>ID</th><th>Клиент</th><th>Предмет спора</th><th>Статус</th><th>Дата</th></tr></thead><tbody>';
+                
+                if (requests.length === 0) {
+                    requestsHtml += '<tr><td colspan="5">Нет анкет</td></tr>';
+                }
+                
+                for (const req of requests) {
+                    requestsHtml += `<tr>
+                        <td>${req.id}</td>
+                        <td>${req.user ? req.user.first_name : 'N/A'}</td>
+                        <td>${(req.dispute_subject || '').substring(0, 30)}...</td>
+                        <td>${req.status}</td>
+                        <td>${new Date(req.created_at).toLocaleString()}</td>
+                    </tr>`;
+                }
+                requestsHtml += '</tbody></table>';
+                document.getElementById('requests-container').innerHTML = requestsHtml;
+            } catch (e) {
+                document.getElementById('requests-container').innerHTML = 'Ошибка: ' + e.message;
+            }
+            
+            // Загрузка партнёров
+            try {
+                const partnersResponse = await fetch('/api/partners');
+                const partners = await partnersResponse.json();
+                
+                let partnersHtml = '<table><thead><tr><th>ID</th><th>ФИО</th><th>Компания</th><th>Email</th></tr></thead><tbody>';
+                
+                if (partners.length === 0) {
+                    partnersHtml += '<tr><td colspan="4">Нет партнёров</td></tr>';
+                }
+                
+                for (const partner of partners) {
+                    partnersHtml += `<tr>
+                        <td>${partner.id}</td>
+                        <td>${partner.full_name}</td>
+                        <td>${partner.company_name}</td>
+                        <td>${partner.email}</td>
+                    </tr>`;
+                }
+                partnersHtml += '</tbody></table>';
+                document.getElementById('partners-container').innerHTML = partnersHtml;
+            } catch (e) {
+                document.getElementById('partners-container').innerHTML = 'Ошибка: ' + e.message;
+            }
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>
