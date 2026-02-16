@@ -28,6 +28,18 @@ MESSAGE_SERVER_URL = os.getenv("MESSAGE_SERVER_URL", "http://127.0.0.1:8002")
 class DirectMessageRequest(BaseModel):
     """Запрос на отправку прямого сообщения пользователю"""
     telegram_id: int
+    message: str
+
+
+class DialogMessageRequest(BaseModel):
+    """Запрос на отправку сообщения в диалоге"""
+    content: str
+    sender_type: str = "admin"  # admin или client
+
+
+class UserMessageRequest(BaseModel):
+    """Запрос на сохранение сообщения от пользователя"""
+    telegram_id: int
     content: str
 
 # Читаем simple_test.html
@@ -1188,7 +1200,7 @@ async def send_notification_to_client(telegram_id: int, message: str) -> bool:
 @app.post("/api/messages/direct")
 async def send_direct_message(request: DirectMessageRequest):
     """Отправить сообщение напрямую пользователю"""
-    notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.content}"
+    notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.message}"
     
     sent = await send_notification_to_client(
         telegram_id=request.telegram_id,
@@ -1199,6 +1211,163 @@ async def send_direct_message(request: DirectMessageRequest):
         "message": "Сообщение отправлено",
         "telegram_id": request.telegram_id,
         "sent": sent
+    }
+
+
+@app.get("/api/dialogs")
+async def get_dialogs(db: AsyncSession = Depends(get_db_session)):
+    """Получить список диалогов с пользователями"""
+    # Находим всех пользователей, которые отправляли или получали сообщения
+    result = await db.execute(
+        select(
+            User.id,
+            User.telegram_id,
+            User.username,
+            User.first_name,
+            User.last_name,
+            func.max(CaseMessage.created_at).label('last_message_time'),
+            func.count(CaseMessage.id).label('message_count')
+        )
+        .outerjoin(CaseMessage, CaseMessage.sender_id == User.id)
+        .group_by(User.id, User.telegram_id, User.username, User.first_name, User.last_name)
+        .order_by(func.max(CaseMessage.created_at).desc())
+    )
+    users_with_messages = result.all()
+    
+    # Также добавляем пользователей без сообщений
+    all_users_result = await db.execute(
+        select(User).order_by(User.registered_at.desc())
+    )
+    all_users = all_users_result.scalars().all()
+    
+    dialogs = []
+    existing_ids = {u.id for u in users_with_messages}
+    
+    for user in all_users:
+        if user.id not in existing_ids:
+            dialogs.append({
+                "user_id": user.id,
+                "telegram_id": user.telegram_id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "last_message_time": None,
+                "message_count": 0
+            })
+    
+    # Добавляем пользователей с сообщениями
+    for u in users_with_messages:
+        dialogs.append({
+            "user_id": u.id,
+            "telegram_id": u.telegram_id,
+            "username": u.username,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "last_message_time": u.last_message_time.isoformat() if u.last_message_time else None,
+            "message_count": u.message_count
+        })
+    
+    # Сортируем по последнему сообщению
+    dialogs.sort(key=lambda x: x['last_message_time'] or '', reverse=True)
+    
+    return dialogs
+
+
+@app.get("/api/dialogs/{user_id}/messages")
+async def get_dialog_messages(user_id: int, db: AsyncSession = Depends(get_db_session)):
+    """Получить сообщения диалога с пользователем"""
+    # Находим все сообщения от этого пользователя
+    result = await db.execute(
+        select(CaseMessage)
+        .filter(CaseMessage.sender_id == user_id)
+        .order_by(CaseMessage.created_at.asc())
+    )
+    messages = result.scalars().all()
+    
+    messages_data = []
+    for msg in messages:
+        messages_data.append({
+            "id": msg.id,
+            "sender_id": msg.sender_id,
+            "sender_type": msg.sender_type,
+            "message_content": msg.message_content,
+            "is_read": msg.is_read,
+            "created_at": msg.created_at.isoformat()
+        })
+    
+    return messages_data
+
+
+@app.post("/api/dialogs/{user_id}/messages")
+async def send_dialog_message(user_id: int, request: DialogMessageRequest, db: AsyncSession = Depends(get_db_session)):
+    """Отправить сообщение пользователю в диалоге"""
+    # Проверяем, что пользователь существует
+    user_result = await db.execute(
+        select(User).filter(User.id == user_id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Создаём сообщение в диалоге (используем questionnaire_id = 0 для общих диалогов)
+    new_message = CaseMessage(
+        questionnaire_id=0,  # 0 означает общий диалог
+        sender_id=user_id,  # ID пользователя-получателя
+        sender_type=request.sender_type,
+        message_content=request.content
+    )
+    db.add(new_message)
+    await db.commit()
+    await db.refresh(new_message)
+    
+    # Отправляем уведомление пользователю через Telegram
+    if request.sender_type == "admin":
+        notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.content}"
+        await send_notification_to_client(
+            telegram_id=user.telegram_id,
+            message=notification_text
+        )
+    
+    return {
+        "id": new_message.id,
+        "sender_id": new_message.sender_id,
+        "sender_type": new_message.sender_type,
+        "message_content": new_message.message_content,
+        "created_at": new_message.created_at.isoformat()
+    }
+
+
+@app.post("/api/messages/dialog")
+async def save_user_message(request: UserMessageRequest, db: AsyncSession = Depends(get_db_session)):
+    """
+    Сохранить сообщение от пользователя (вызывается из бота)
+    Это endpoint, который вызывает бот когда пользователь пишет нам
+    """
+    # Находим пользователя по telegram_id
+    user_result = await db.execute(
+        select(User).filter(User.telegram_id == request.telegram_id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Создаём сообщение от клиента
+    new_message = CaseMessage(
+        questionnaire_id=0,  # 0 означает общий диалог
+        sender_id=user.id,
+        sender_type="client",
+        message_content=request.content
+    )
+    db.add(new_message)
+    await db.commit()
+    await db.refresh(new_message)
+    
+    return {
+        "success": True,
+        "message": "Сообщение сохранено",
+        "message_id": new_message.id
     }
 
 
