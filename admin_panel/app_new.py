@@ -10,12 +10,25 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 from datetime import datetime
 import asyncio
+import httpx
+
+from pydantic import BaseModel
+from typing import Optional, Any
 
 from database.database import get_db, get_db_session
 from database.models import User, PartnerProfile, CaseQuestionnaire, ServiceRequest, PartnerRevenue, ReferralPayout, ReferralRelationship, CaseMessage
 from config.settings import settings
 
 app = FastAPI(title="Admin Panel for Law Bot")
+
+# URL message_server для отправки уведомлений клиентам
+MESSAGE_SERVER_URL = os.getenv("MESSAGE_SERVER_URL", "http://127.0.0.1:8002")
+
+
+class DirectMessageRequest(BaseModel):
+    """Запрос на отправку прямого сообщения пользователю"""
+    telegram_id: int
+    content: str
 
 # Читаем simple_test.html
 SIMPLE_TEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "simple_test.html")
@@ -1149,6 +1162,44 @@ async def get_users_referrals_info():
             })
         
         return {"users": users_data}
+
+
+async def send_notification_to_client(telegram_id: int, message: str) -> bool:
+    """Отправить уведомление клиенту через message_server"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{MESSAGE_SERVER_URL}/api/notify",
+                json={
+                    "telegram_id": telegram_id,
+                    "message": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True
+                }
+            )
+            if response.status_code == 200:
+                return True
+            else:
+                return False
+    except Exception as e:
+        return False
+
+
+@app.post("/api/messages/direct")
+async def send_direct_message(request: DirectMessageRequest):
+    """Отправить сообщение напрямую пользователю"""
+    notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.content}"
+    
+    sent = await send_notification_to_client(
+        telegram_id=request.telegram_id,
+        message=notification_text
+    )
+    
+    return {
+        "message": "Сообщение отправлено",
+        "telegram_id": request.telegram_id,
+        "sent": sent
+    }
 
 
 if __name__ == "__main__":
