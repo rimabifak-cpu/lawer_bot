@@ -87,6 +87,28 @@ async def get_db():
         await session.close()
 
 
+# Зависимость для FastAPI
+async def get_db_session():
+    """
+    Зависимость для FastAPI для получения сессии базы данных.
+    
+    Использование в FastAPI:
+        @app.get("/items")
+        async def get_items(db: AsyncSession = Depends(get_db_session)):
+            ...
+    """
+    session = AsyncSessionLocal()
+    try:
+        yield session
+        await session.commit()
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Ошибка при работе с базой данных: {e}")
+        raise
+    finally:
+        await session.close()
+
+
 async def init_db():
     """
     Инициализация базы данных - создание всех таблиц

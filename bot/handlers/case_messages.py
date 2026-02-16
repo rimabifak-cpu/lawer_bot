@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 # URL админ-панели для сохранения сообщений пользователей
-ADMIN_PANEL_URL = os.getenv("ADMIN_PANEL_URL", "http://127.0.0.1:8000")
+ADMIN_PANEL_URL = os.getenv("ADMIN_PANEL_URL", "http://127.0.0.1:8001")
 
 # Константы
 MENU_COMMANDS = frozenset([

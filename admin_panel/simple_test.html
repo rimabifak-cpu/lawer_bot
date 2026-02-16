@@ -86,10 +86,11 @@
                     <th>ФИО</th>
                     <th>Компания</th>
                     <th>Email</th>
+                    <th>Действие</th>
                 </tr>
             </thead>
             <tbody id="partners-body">
-                <tr><td colspan="4">Загрузка...</td></tr>
+                <tr><td colspan="5">Загрузка...</td></tr>
             </tbody>
         </table>
     </div>
@@ -122,7 +123,7 @@
         async function loadUsersList() {
             const select = document.getElementById('user-select');
             try {
-                const response = await fetch('/api/users/list');
+                const response = await fetch('/api/users');
                 const users = await response.json();
                 
                 select.innerHTML = '<option value="">Выберите пользователя...</option>';
@@ -130,7 +131,9 @@
                 users.forEach(user => {
                     const option = document.createElement('option');
                     option.value = user.telegram_id;
-                    option.textContent = user.display_name;
+                    // Используем first_name или partner_name или username как отображаемое имя
+                    const displayName = user.first_name || user.partner_name || user.username || 'Пользователь ' + user.id;
+                    option.textContent = displayName + (user.is_partner ? ' (партнёр)' : '');
                     select.appendChild(option);
                 });
             } catch (e) {
@@ -182,6 +185,40 @@
         
         // Загружаем список пользователей при загрузке страницы
         loadUsersList();
+        
+        // Глобальная переменная для хранения всех партнёров
+        let allPartners = [];
+        
+        // Функция для показа деталей партнёра
+        function showPartnerDetails(partnerId) {
+            const partner = allPartners.find(p => p.id === partnerId);
+            if (!partner) {
+                alert('Партнёр не найден');
+                return;
+            }
+            
+            const modal = document.getElementById('partner-details-modal');
+            const content = document.getElementById('partner-details-content');
+            
+            content.innerHTML = `
+                <div class="detail-row"><div class="detail-label">ID:</div><div class="detail-value">${partner.id}</div></div>
+                <div class="detail-row"><div class="detail-label">ФИО:</div><div class="detail-value">${partner.full_name || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Компания:</div><div class="detail-value">${partner.company_name || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Телефон:</div><div class="detail-value">${partner.phone || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Email:</div><div class="detail-value">${partner.email || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Специализация:</div><div class="detail-value">${partner.specialization || '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Опыт:</div><div class="detail-value">${partner.experience ? partner.experience + ' лет' : '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Согласие на обработку данных:</div><div class="detail-value">${partner.consent_to_share_data ? 'Да' : 'Нет'}</div></div>
+                <div class="detail-row"><div class="detail-label">Дата создания:</div><div class="detail-value">${partner.created_at ? new Date(partner.created_at).toLocaleString() : '-'}</div></div>
+                <div class="detail-row"><div class="detail-label">Дата обновления:</div><div class="detail-value">${partner.updated_at ? new Date(partner.updated_at).toLocaleString() : '-'}</div></div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+        
+        function closePartnerModal() {
+            document.getElementById('partner-details-modal').style.display = 'none';
+        }
         
         // Функция для показа деталей дела
         function showCaseDetails(requestId) {
@@ -254,15 +291,15 @@
                 debug.push('Загрузка партнёров...');
                 const partnersRes = await fetch('/api/partners');
                 debug.push('Статус ответа партнёров: ' + partnersRes.status);
-                const partners = await partnersRes.json();
-                debug.push('Получено партнёров: ' + partners.length);
+                allPartners = await partnersRes.json();
+                debug.push('Получено партнёров: ' + allPartners.length);
                 
                 let partnersHtml = '';
-                if (partners.length === 0) {
-                    partnersHtml = '<tr><td colspan="4">Нет партнёров</td></tr>';
+                if (allPartners.length === 0) {
+                    partnersHtml = '<tr><td colspan="5">Нет партнёров</td></tr>';
                 } else {
-                    for (const p of partners) {
-                        partnersHtml += `<tr><td>${p.id}</td><td>${p.full_name}</td><td>${p.company_name}</td><td>${p.email}</td></tr>`;
+                    for (const p of allPartners) {
+                        partnersHtml += `<tr><td>${p.id}</td><td>${p.full_name}</td><td>${p.company_name}</td><td>${p.email}</td><td><button class="btn-details" onclick="showPartnerDetails(${p.id})">Подробнее</button></td></tr>`;
                     }
                 }
                 document.getElementById('partners-body').innerHTML = partnersHtml;
@@ -308,6 +345,17 @@
                 <span class="modal-close" onclick="closeModal()">&times;</span>
             </div>
             <div id="case-details-content"></div>
+        </div>
+    </div>
+    
+    <!-- Modal for partner details -->
+    <div id="partner-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Детали партнёра</h2>
+                <span class="modal-close" onclick="closePartnerModal()">&times;</span>
+            </div>
+            <div id="partner-details-content"></div>
         </div>
     </div>
 </body>

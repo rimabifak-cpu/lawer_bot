@@ -6,12 +6,12 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 from datetime import datetime
 import asyncio
 
-from database.database import get_db
+from database.database import get_db, get_db_session
 from database.models import User, PartnerProfile, CaseQuestionnaire, ServiceRequest, PartnerRevenue, ReferralPayout, ReferralRelationship, CaseMessage
 from config.settings import settings
 
@@ -243,7 +243,7 @@ async def admin_dashboard():
                         
                         // Статус с цветовой индикацией
                         const statusCell = row.insertCell(3);
-                        const statusRu = { 'sent': '📤 отправлено', 'in_progress': '🔄 в работе', 'completed': '✅ завершено', 'new': '🆕 новый' };
+                        const statusRu = { 'sent': 'sent', 'in_progress': 'in_progress', 'completed': 'completed', 'new': 'new' };
                         statusCell.innerHTML = '<span>' + (statusRu[request.status] || request.status) + '</span>';
                         
                         row.insertCell(4).textContent = request.sent_at ? new Date(request.sent_at).toLocaleString('ru-RU') : '-';
@@ -846,7 +846,7 @@ async def get_partner_revenues(partner_id: int):
 
 
 @app.get("/api/payouts")
-async def get_payouts(db: AsyncSession = Depends(get_db)):
+async def get_payouts(db: AsyncSession = Depends(get_db_session)):
     """Получить список всех выплат"""
     result = await db.execute(
         select(ReferralPayout)
@@ -879,7 +879,7 @@ async def get_payouts(db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/payouts")
-async def create_payout(payout_data: dict, db: AsyncSession = Depends(get_db)):
+async def create_payout(payout_data: dict, db: AsyncSession = Depends(get_db_session)):
     """Создать выплату рефереру"""
     referrer_id = payout_data.get("referrer_id")
     amount = payout_data.get("amount")
@@ -903,7 +903,7 @@ async def create_payout(payout_data: dict, db: AsyncSession = Depends(get_db)):
 
 
 @app.put("/api/payouts/{payout_id}/pay")
-async def mark_payout_as_paid(payout_id: int, db: AsyncSession = Depends(get_db)):
+async def mark_payout_as_paid(payout_id: int, db: AsyncSession = Depends(get_db_session)):
     """Отметить выплату как выполненную и отправить уведомление"""
     result = await db.execute(
         select(ReferralPayout).filter(ReferralPayout.id == payout_id)
@@ -950,7 +950,7 @@ async def mark_payout_as_paid(payout_id: int, db: AsyncSession = Depends(get_db)
 
 
 @app.get("/api/referrers")
-async def get_referrers(db: AsyncSession = Depends(get_db)):
+async def get_referrers(db: AsyncSession = Depends(get_db_session)):
     """Получить список всех рефереров (партнёров, у которых есть приглашённые)"""
     # Находим всех пользователей, которые кого-то пригласили
     result = await db.execute(
@@ -985,7 +985,7 @@ async def get_referrers(db: AsyncSession = Depends(get_db)):
 # ==================== API ПОЛЬЗОВАТЕЛЕЙ ====================
 
 @app.get("/api/users")
-async def get_users(db: AsyncSession = Depends(get_db)):
+async def get_users(db: AsyncSession = Depends(get_db_session)):
     """Получить список всех пользователей (для выбора при добавлении выручки)"""
     result = await db.execute(
         select(User).order_by(User.registered_at.desc())
@@ -1017,7 +1017,7 @@ async def get_users(db: AsyncSession = Depends(get_db)):
 # ==================== API СООБЩЕНИЙ ПО ДЕЛАМ ====================
 
 @app.get("/api/cases/{case_id}/messages")
-async def get_case_messages(case_id: int, db: AsyncSession = Depends(get_db)):
+async def get_case_messages(case_id: int, db: AsyncSession = Depends(get_db_session)):
     """Получить переписку по делу"""
     result = await db.execute(
         select(CaseMessage)
@@ -1044,7 +1044,7 @@ async def get_case_messages(case_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/cases/{case_id}/messages")
-async def send_case_message(case_id: int, message_data: dict, db: AsyncSession = Depends(get_db)):
+async def send_case_message(case_id: int, message_data: dict, db: AsyncSession = Depends(get_db_session)):
     """Отправить сообщение по делу (от админа)"""
     content = message_data.get("content")
     sender_id = message_data.get("sender_id", 0)  # ID админа (0 для системных)
@@ -1090,6 +1090,65 @@ async def send_case_message(case_id: int, message_data: dict, db: AsyncSession =
         "notification": notification_text,
         "user_telegram_id": user.telegram_id if user else None
     }
+
+
+@app.get("/api/users/referrals-info")
+async def get_users_referrals_info():
+    """Получить всех пользователей с информацией о рефералах"""
+    async with get_db() as db:
+        users_query = text("""
+            SELECT u.id, u.telegram_id, u.username, u.first_name, u.registered_at,
+                   pp.full_name as partner_name
+            FROM users u
+            LEFT JOIN partner_profiles pp ON u.id = pp.user_id
+            ORDER BY u.registered_at DESC
+        """)
+        
+        users_result = await db.execute(users_query)
+        users = users_result.fetchall()
+        
+        ref_query = text("""
+            SELECT rr.referrer_id, rr.referred_id,
+                   r.telegram_id as ref_telegram_id, r.first_name as ref_first_name, r.username as ref_username,
+                   pp.full_name as ref_partner_name
+            FROM referral_relationships rr
+            JOIN users r ON rr.referrer_id = r.id
+            LEFT JOIN partner_profiles pp ON r.id = pp.user_id
+        """)
+        
+        ref_result = await db.execute(ref_query)
+        relationships = ref_result.fetchall()
+        
+        referrer_of = {}
+        referrals_count = {}
+        
+        for rel in relationships:
+            ref_name = (rel.ref_partner_name and rel.ref_partner_name.strip()) or (
+                f"{rel.ref_first_name} (@{rel.ref_username})" if rel.ref_username else rel.ref_first_name
+            ) or "Unknown"
+            referrer_of[rel.referred_id] = {
+                "telegram_id": rel.ref_telegram_id,
+                "name": ref_name
+            }
+            referrals_count[rel.referrer_id] = referrals_count.get(rel.referrer_id, 0) + 1
+        
+        users_data = []
+        for user in users:
+            user_name = (user.partner_name and user.partner_name.strip()) or (
+                f"{user.first_name} (@{user.username})" if user.username else user.first_name
+            ) or "Unknown"
+            
+            users_data.append({
+                "id": user.id,
+                "telegram_id": user.telegram_id,
+                "username": user.username,
+                "name": user_name,
+                "registered_at": user.registered_at if user.registered_at else None,
+                "invited_by": referrer_of.get(user.id),
+                "invited_count": referrals_count.get(user.id, 0)
+            })
+        
+        return {"users": users_data}
 
 
 if __name__ == "__main__":
