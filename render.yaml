@@ -47,7 +47,6 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /api/test-db
-    healthCheckTimeout: 60
 
 databases:
   - name: law-bot-db
