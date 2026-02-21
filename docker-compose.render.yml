@@ -1,0 +1,70 @@
+# Render не поддерживает docker-compose для деплоя
+# Используем render.yaml вместо этого
+
+# Этот файл для локальной разработки
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: law_bot_db
+    restart: always
+    environment:
+      POSTGRES_DB: law_bot_db
+      POSTGRES_USER: law_bot_user
+      POSTGRES_PASSWORD: local_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U law_bot_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Telegram Bot (для локального тестирования)
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.render
+    container_name: law_bot
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
+      - DATABASE_URL=postgresql+asyncpg://law_bot_user:local_password@postgres/law_bot_db
+      - UPLOAD_FOLDER=/tmp/uploads
+      - MAX_FILE_SIZE=20971520
+      - ALLOWED_EXTENSIONS=pdf,jpg,jpeg,png,doc,docx
+      - DEBUG=${DEBUG:-True}
+    volumes:
+      - ./uploads:/tmp/uploads
+
+  # Admin Panel (для локального тестирования)
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.render
+    container_name: law_bot_admin
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://law_bot_user:local_password@postgres/law_bot_db
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
+      - UPLOAD_FOLDER=/tmp/uploads
+      - PORT=8000
+    ports:
+      - "8000:10000"
+    volumes:
+      - ./uploads:/tmp/uploads
+
+volumes:
+  postgres_data:

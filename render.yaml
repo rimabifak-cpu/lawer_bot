@@ -1,0 +1,56 @@
+services:
+  # Telegram Bot (Background Worker)
+  - type: worker
+    name: law-bot-worker
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_bot.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: law-bot-db
+          property: connectionString
+      - key: UPLOAD_FOLDER
+        value: /tmp/uploads
+      - key: MAX_FILE_SIZE
+        value: "20971520"
+      - key: ALLOWED_EXTENSIONS
+        value: pdf,jpg,jpeg,png,doc,docx
+      - key: DEBUG
+        value: "False"
+
+  # Admin Panel (Web Service)
+  - type: web
+    name: law-bot-admin
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn admin_panel.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: law-bot-db
+          property: connectionString
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: UPLOAD_FOLDER
+        value: /tmp/uploads
+      - key: PORT
+        value: 10000
+    healthCheckPath: /api/test-db
+    healthCheckTimeout: 60
+
+databases:
+  - name: law-bot-db
+    databaseName: law_bot_db
+    user: law_bot_user
+    plan: free

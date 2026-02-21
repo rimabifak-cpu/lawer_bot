@@ -57,8 +57,9 @@
     
     <div class="nav-links">
         <span>📁 Навигация:</span>
-        <a href="/test">🏠 Главная</a>
-        <a href="/dialogs">💬 Диалоги с пользователями</a>
+        <a href="#" onclick="switchTab('home'); return false;">🏠 Главная</a>
+        <a href="#" onclick="switchTab('dialogs'); return false;">💬 Диалоги с пользователями</a>
+        <a href="#" onclick="reloadPage(); return false;">🔄 Перезагрузить</a>
     </div>
     
     <p>Дата и время загрузки: <span id="load-time"></span></p>
@@ -206,7 +207,7 @@
                     },
                     body: JSON.stringify({
                         telegram_id: parseInt(telegramId),
-                        message: message
+                        content: message
                     })
                 });
                 
@@ -376,7 +377,32 @@
         
         // Запускаем загрузку
         loadData();
-        loadChatDialogs();
+        
+    // Tab switching functionality
+    function switchTab(tabName) {
+        // Hide all content sections
+        const sections = document.querySelectorAll('.section');
+        sections.forEach(section => section.style.display = 'none');
+        
+        // Hide chat container if it's not the dialogs tab
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.style.display = tabName === 'dialogs' ? 'flex' : 'none';
+        }
+        
+        // Show selected section
+        if (tabName === 'home') {
+            // Show all sections for home tab
+            sections.forEach(section => section.style.display = 'block');
+        }
+        
+        // Update active tab
+        const tabs = document.querySelectorAll('.nav-links a');
+        tabs.forEach(tab => tab.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+loadChatDialogs();
         
         // Chat functionality
         let currentChatUserId = null;
@@ -394,12 +420,12 @@
                 }
                 
                 let html = '';
-                chatDialogs.forEach(user => {
-                    const displayName = user.first_name || user.username || 'Пользователь ' + user.user_id;
-                    const lastMsg = user.last_message_time ? new Date(user.last_message_time).toLocaleString() : 'Нет сообщений';
-                    html += `<div class="chat-user-item" onclick="selectChatUser(${user.user_id}, '${displayName.replace(/'/g, "\\'")}')">
+                chatDialogs.forEach(dialog => {
+                    const displayName = dialog.display_name || 'Пользователь ' + dialog.telegram_id;
+                    const lastMsg = dialog.last_time ? new Date(dialog.last_time).toLocaleString() : 'Нет сообщений';
+                    html += `<div class="chat-user-item" onclick="selectChatUser(${dialog.telegram_id}, '${displayName.replace(/'/g, "\\'")}')">
                         <div class="chat-user-name">${displayName}</div>
-                        <div class="chat-user-preview">${lastMsg} (${user.message_count} сообщ.)</div>
+                        <div class="chat-user-preview">${lastMsg} (${dialog.unread_count || 0} непрочитано)</div>
                     </div>`;
                 });
                 usersList.innerHTML = html;
@@ -433,7 +459,15 @@
             
             try {
                 const response = await fetch(`/api/dialogs/${userId}/messages`);
-                const messages = await response.json();
+                const data = await response.json();
+                
+                // Гарантируем, что messages - это массив
+                let messages = [];
+                if (data && typeof data === 'object' && Array.isArray(data.messages)) {
+                    messages = data.messages;
+                } else if (Array.isArray(data)) {
+                    messages = data;
+                }
                 
                 if (messages.length === 0) {
                     messagesList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Нет сообщений. Начните диалог!</div>';
@@ -442,10 +476,11 @@
                 
                 let html = '';
                 messages.forEach(msg => {
-                    const time = new Date(msg.created_at).toLocaleString();
+                    const time = msg.created_at ? new Date(msg.created_at).toLocaleString() : 'Нет даты';
                     const isAdmin = msg.sender_type === 'admin';
+                    const content = msg.content || msg.message_content || 'Нет текста';
                     html += `<div class="chat-message ${isAdmin ? 'admin' : 'client'}">
-                        <div>${escapeHtml(msg.message_content)}</div>
+                        <div>${escapeHtml(content)}</div>
                         <div class="chat-message-time">${time}</div>
                     </div>`;
                 });
@@ -468,12 +503,12 @@
             input.value = '';
             
             try {
-                const response = await fetch(`/api/dialogs/${currentChatUserId}/messages`, {
+                const response = await fetch(`/api/dialogs/${currentChatUserId}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        content: message,
-                        sender_type: 'admin'
+                        telegram_id: currentChatUserId,
+                        content: message
                     })
                 });
                 
@@ -498,6 +533,39 @@
             }
         });
         
+        // Switch tab functionality
+        // Перезагрузка страницы
+        function reloadPage() {
+            location.reload();
+        }
+
+        function switchTab(tabName) {
+            // Hide all sections
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(section => section.style.display = 'none');
+            
+            // Show selected section
+            if (tabName === 'home') {
+                // Show all sections except chat
+                sections.forEach(section => {
+                    if (!section.querySelector('.chat-container')) {
+                        section.style.display = 'block';
+                    }
+                });
+            } else if (tabName === 'dialogs') {
+                // Show only chat section
+                let chatSection = null;
+                sections.forEach(section => {
+                    if (section.querySelector('.chat-container')) {
+                        chatSection = section;
+                    }
+                });
+                if (chatSection) {
+                    chatSection.style.display = 'block';
+                }
+            }
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;

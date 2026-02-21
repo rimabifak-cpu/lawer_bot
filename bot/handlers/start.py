@@ -84,6 +84,9 @@ async def get_or_create_user(
         await db.commit()
         await db.refresh(user)
         logger.info(f"Создан новый пользователь: {user_id}")
+        
+        # Отправляем уведомление в чат админов
+        await send_new_user_notification(user)
     else:
         # Обновляем данные пользователя если изменились
         updated = False
@@ -102,6 +105,39 @@ async def get_or_create_user(
             logger.debug(f"Обновлены данные пользователя: {user_id}")
     
     return user
+
+
+async def send_new_user_notification(user: User):
+    """
+    Отправляет уведомление в чат админов о новом пользователе
+    
+    Args:
+        user: Объект нового пользователя
+    """
+    try:
+        from config.settings import settings
+        from bot.main import bot
+        
+        admin_chat_id = settings.ADMIN_CHAT_ID
+        if admin_chat_id:
+            # Форматируем сообщение
+            user_info = (
+                f"👤 Новый пользователь:\n"
+                f"ID: {user.telegram_id}\n"
+                f"Имя: {user.first_name or 'Не указано'}\n"
+                f"Фамилия: {user.last_name or 'Не указано'}\n"
+                f"Username: @{user.username}" if user.username else "Username: Не указан"
+            )
+            
+            await bot.send_message(
+                chat_id=admin_chat_id,
+                text=user_info
+            )
+            logger.info(f"Уведомление о новом пользователе {user.telegram_id} отправлено в чат админов")
+        else:
+            logger.warning("ADMIN_CHAT_ID не настроен, уведомление не отправлено")
+    except Exception as e:
+        logger.error(f"Ошибка при отправке уведомления о новом пользователе {user.telegram_id}: {e}")
 
 
 async def process_referral(

@@ -104,24 +104,31 @@ class BatchPayRequest(BaseModel):
 # ============================================
 
 async def send_notification_to_client(telegram_id: int, message: str) -> bool:
-    """Отправить уведомление клиенту через message_server"""
+    """Отправить уведомление клиенту через Telegram bot"""
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{MESSAGE_SERVER_URL}/api/notify",
-                json={
-                    "telegram_id": telegram_id,
-                    "message": message,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True
-                }
+        # Проверка настроек бота
+        if not settings.BOT_TOKEN:
+            logger.error("BOT_TOKEN не настроен в конфигурации")
+            return False
+            
+        from aiogram import Bot
+        from aiogram.client.session.aiohttp import AiohttpSession
+        
+        session = AiohttpSession()
+        bot = Bot(token=settings.BOT_TOKEN, session=session)
+        
+        try:
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=message,
+                parse_mode="HTML",
+                disable_web_page_preview=True
             )
-            if response.status_code == 200:
-                logger.info(f"Уведомление отправлено пользователю {telegram_id}")
-                return True
-            else:
-                logger.error(f"Ошибка отправки уведомления: {response.text}")
-                return False
+            logger.info(f"Уведомление отправлено пользователю {telegram_id}")
+            return True
+        finally:
+            await bot.session.close()
+            
     except Exception as e:
         logger.error(f"Исключение при отправке уведомления: {e}")
         return False
@@ -830,6 +837,48 @@ async def get_users_referrals_info():
 
 
 # ============================================
+# API статистики
+# ============================================
+
+@app.get("/api/stats")
+async def get_stats():
+    """Получить основную статистику системы"""
+    async with get_db() as db:
+        # Общее количество пользователей
+        users_count_result = await db.execute(func.count(User.id))
+        users_count = users_count_result.scalar_one_or_none() or 0
+        
+        # Количество партнёров
+        partners_count_result = await db.execute(func.count(PartnerProfile.id))
+        partners_count = partners_count_result.scalar_one_or_none() or 0
+        
+        # Количество заявок
+        requests_count_result = await db.execute(func.count(CaseQuestionnaire.id))
+        requests_count = requests_count_result.scalar_one_or_none() or 0
+        
+        # Количество выплат
+        payouts_count_result = await db.execute(func.count(ReferralPayout.id))
+        payouts_count = payouts_count_result.scalar_one_or_none() or 0
+        
+        # Общая сумма выплат
+        total_payouts_result = await db.execute(func.coalesce(func.sum(ReferralPayout.amount), 0))
+        total_payouts = total_payouts_result.scalar_one_or_none() or 0
+        
+        # Количество рефералов
+        referrals_count_result = await db.execute(func.count(ReferralRelationship.id))
+        referrals_count = referrals_count_result.scalar_one_or_none() or 0
+        
+        return {
+            "users_count": users_count,
+            "partners_count": partners_count,
+            "requests_count": requests_count,
+            "payouts_count": payouts_count,
+            "total_payouts": total_payouts,
+            "referrals_count": referrals_count
+        }
+
+
+# ============================================
 # API сообщений
 # ============================================
 
@@ -965,12 +1014,50 @@ async def save_dialog_message(request: DialogMessageRequest):
 @app.post("/api/messages/direct")
 async def send_direct_message(request: DirectMessageRequest):
     """Отправить сообщение напрямую пользователю"""
+    if not request.telegram_id or not request.content:
+        raise HTTPException(status_code=400, detail="telegram_id и content обязательны")
+    
     notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.content}"
     
     sent = await send_notification_to_client(
         telegram_id=request.telegram_id,
         message=notification_text
     )
+    
+    # Сохраняем сообщение в базу данных
+    async with get_db() as db:
+        user_result = await db.execute(
+            select(User).filter(User.telegram_id == request.telegram_id)
+        )
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            user = User(
+                telegram_id=request.telegram_id,
+                username=f"user_{request.telegram_id}",
+                first_name="Клиент",
+                last_name=""
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        
+        case_result = await db.execute(
+            select(CaseQuestionnaire).filter(CaseQuestionnaire.user_id == user.id)
+        )
+        cases = case_result.scalars().all()
+        
+        case_id = cases[0].id if cases else 0
+        
+        new_message = CaseMessage(
+            questionnaire_id=case_id,
+            sender_id=user.id,
+            sender_type="admin",
+            message_content=request.content
+        )
+        db.add(new_message)
+        await db.commit()
+        await db.refresh(new_message)
     
     return {
         "message": "Сообщение отправлено",
@@ -1030,6 +1117,9 @@ async def get_dialogs():
 @app.get("/api/dialogs/{telegram_id}/messages")
 async def get_dialog_messages(telegram_id: int):
     """Получить сообщения диалога с пользователем"""
+    if not telegram_id or telegram_id <= 0:
+        raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+    
     async with get_db() as db:
         user_result = await db.execute(
             select(User).filter(User.telegram_id == telegram_id)
@@ -1325,4 +1415,4 @@ async def admin_dashboard():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8001)
