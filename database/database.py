@@ -27,6 +27,12 @@ sqlite_url = f"sqlite+aiosqlite:///{db_path}"
 # Используем переменную окружения или SQLite по умолчанию
 DATABASE_URL = os.getenv("DATABASE_URL", sqlite_url)
 
+# Для PostgreSQL заменяем postgresql:// на postgresql+asyncpg://
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql+psycopg2://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+
 # Определяем параметры пула в зависимости от типа базы данных
 if DATABASE_URL.startswith("sqlite"):
     # Для SQLite используем NullPool или QueuePool с ограниченными настройками
