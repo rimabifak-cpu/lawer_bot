@@ -34,8 +34,11 @@ elif DATABASE_URL.startswith("postgresql+psycopg2://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
 
 # Добавляем параметры подключения для PostgreSQL
-if "postgresql+asyncpg" in DATABASE_URL and "?" not in DATABASE_URL:
-    DATABASE_URL += "?ssl=require"
+if "postgresql+asyncpg" in DATABASE_URL:
+    if "?" not in DATABASE_URL:
+        DATABASE_URL += "?ssl=require&connect_timeout=10"
+    else:
+        DATABASE_URL += "&ssl=require&connect_timeout=10"
 
 # Определяем параметры пула в зависимости от типа базы данных
 if DATABASE_URL.startswith("sqlite"):
