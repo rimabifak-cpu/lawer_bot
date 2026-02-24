@@ -1175,36 +1175,42 @@ async def send_dialog_message(telegram_id: int, request: DirectMessageRequest):
             select(User).filter(User.telegram_id == telegram_id)
         )
         user = user_result.scalar_one_or_none()
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
-        
+
         case_result = await db.execute(
             select(CaseQuestionnaire).filter(CaseQuestionnaire.user_id == user.id)
         )
         cases = case_result.scalars().all()
-        
-        case_id = cases[0].id if cases else 0
-        
-        new_message = CaseMessage(
-            questionnaire_id=case_id,
-            sender_id=user.id,
-            sender_type="admin",
-            message_content=request.content
-        )
-        db.add(new_message)
-        await db.commit()
-        await db.refresh(new_message)
-        
+
+        # Если есть дело — сохраняем в case_messages, иначе пропускаем
+        if cases:
+            case_id = cases[0].id
+            new_message = CaseMessage(
+                questionnaire_id=case_id,
+                sender_id=user.id,
+                sender_type="admin",
+                message_content=request.content
+            )
+            db.add(new_message)
+            await db.commit()
+            await db.refresh(new_message)
+            logger.info(f"Сообщение сохранено в деле {case_id}")
+        else:
+            # Дела нет — просто отправляем, не сохраняем
+            logger.info(f"Дело не найдено для пользователя {telegram_id}")
+            await db.commit()
+
         notification_text = f"💬 <b>Ответ от ЮК</b>\n\n📝 {request.content}"
         await send_notification_to_client(
             telegram_id=telegram_id,
             message=notification_text
         )
-        
+
         logger.info(f"Сообщение отправлено пользователю {telegram_id}")
-        
-        return {"message": "Сообщение отправлено", "message_id": new_message.id}
+
+        return {"message": "Сообщение отправлено"}
 
 
 # ============================================
