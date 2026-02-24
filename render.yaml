@@ -1,6 +1,6 @@
 services:
-  # Telegram Bot (Background Worker)
-  - type: worker
+  # Telegram Bot (Web Service с polling)
+  - type: web
     name: law-bot-worker
     env: python
     region: frankfurt
@@ -24,6 +24,9 @@ services:
         value: pdf,jpg,jpeg,png,doc,docx
       - key: DEBUG
         value: "False"
+      - key: PORT
+        value: "8080"
+    healthCheckPath: /health
 
   # Admin Panel (Web Service)
   - type: web
@@ -44,8 +47,6 @@ services:
         sync: false
       - key: UPLOAD_FOLDER
         value: /tmp/uploads
-      - key: PORT
-        value: 10000
     healthCheckPath: /api/test-db
 
 databases:
