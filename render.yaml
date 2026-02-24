@@ -3,7 +3,7 @@ services:
   - type: web
     name: law-bot
     env: python
-    region: frankfurt
+    region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt && python migrate_telegram_id.py
     startCommand: python run_bot.py
@@ -30,7 +30,7 @@ services:
   - type: web
     name: law-bot-admin
     env: python
-    region: frankfurt
+    region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn admin_panel.app:app --host 0.0.0.0 --port $PORT
