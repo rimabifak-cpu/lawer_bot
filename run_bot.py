@@ -27,13 +27,14 @@ async def health_handler(request):
     return web.json_response({"status": "ok"})
 
 async def create_http_server():
+    port = int(os.environ.get('PORT', 10000))
     app = web.Application()
     app.router.add_get('/health', health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 8080)))
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logger.info(f"HTTP server started on port {os.environ.get('PORT', 8080)}")
+    logger.info(f"HTTP server started on port {port}")
     return runner
 
 async def check_bot_token():
