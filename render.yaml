@@ -5,8 +5,7 @@ services:
     env: python
     region: frankfurt
     plan: free
-    preDeployCommand: python migrate_telegram_id.py
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python migrate_telegram_id.py
     startCommand: python run_bot.py
     envVars:
       - key: BOT_TOKEN
