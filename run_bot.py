@@ -49,6 +49,21 @@ async def check_bot_token():
         logger.error(f"Error checking bot token: {e}")
         return False
 
+async def init_database():
+    """Инициализация базы данных - создание таблиц"""
+    try:
+        from database.models import Base
+        from database.database import engine
+        
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        logger.info("Database tables created successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        return False
+
 async def main():
     # Импорт хендлеров
     from bot.handlers import register_handlers
@@ -63,6 +78,12 @@ async def main():
     token_valid = await check_bot_token()
     if not token_valid:
         logger.error("Bot token invalid. Exiting...")
+        return
+
+    # Инициализация базы данных
+    db_initialized = await init_database()
+    if not db_initialized:
+        logger.error("Database initialization failed. Exiting...")
         return
 
     # Отключаем webhook (чтобы избежать конфликтов)
