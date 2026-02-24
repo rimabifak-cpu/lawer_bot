@@ -1016,21 +1016,21 @@ async def send_direct_message(request: DirectMessageRequest):
     """Отправить сообщение напрямую пользователю"""
     if not request.telegram_id or not request.content:
         raise HTTPException(status_code=400, detail="telegram_id и content обязательны")
-    
+
     notification_text = f"💬 <b>Сообщение от ЮК</b>\n\n📝 {request.content}"
-    
+
     sent = await send_notification_to_client(
         telegram_id=request.telegram_id,
         message=notification_text
     )
-    
+
     # Сохраняем сообщение в базу данных
     async with get_db() as db:
         user_result = await db.execute(
             select(User).filter(User.telegram_id == request.telegram_id)
         )
         user = user_result.scalar_one_or_none()
-        
+
         if not user:
             user = User(
                 telegram_id=request.telegram_id,
@@ -1041,24 +1041,30 @@ async def send_direct_message(request: DirectMessageRequest):
             db.add(user)
             await db.commit()
             await db.refresh(user)
-        
+
         case_result = await db.execute(
             select(CaseQuestionnaire).filter(CaseQuestionnaire.user_id == user.id)
         )
         cases = case_result.scalars().all()
-        
-        case_id = cases[0].id if cases else 0
-        
-        new_message = CaseMessage(
-            questionnaire_id=case_id,
-            sender_id=user.id,
-            sender_type="admin",
-            message_content=request.content
-        )
-        db.add(new_message)
-        await db.commit()
-        await db.refresh(new_message)
-    
+
+        # Если есть дело — сохраняем в case_messages, иначе пропускаем сохранение
+        if cases:
+            case_id = cases[0].id
+            new_message = CaseMessage(
+                questionnaire_id=case_id,
+                sender_id=user.id,
+                sender_type="admin",
+                message_content=request.content
+            )
+            db.add(new_message)
+            await db.commit()
+            await db.refresh(new_message)
+            logger.info(f"Сообщение сохранено в деле {case_id}")
+        else:
+            # Дела нет — просто отправляем, не сохраняем в case_messages
+            logger.info(f"Дело не найдено для пользователя {user.id}, сообщение не сохранено")
+            await db.commit()  # Завершаем транзакцию без сохранения сообщения
+
     return {
         "message": "Сообщение отправлено",
         "telegram_id": request.telegram_id,
