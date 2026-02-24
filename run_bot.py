@@ -56,24 +56,23 @@ async def init_database():
         from database.database import engine
         from sqlalchemy import text
         
-        # Создаем все таблицы
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        
-        logger.info("Database tables created successfully")
-        
-        # Выполняем миграцию telegram_id на BigInteger
-        if settings.DATABASE_URL.startswith("postgresql"):
-            try:
-                async with engine.begin() as conn:
+            # Сначала выполняем миграцию telegram_id на BigInteger (если таблица существует)
+            if settings.DATABASE_URL.startswith("postgresql"):
+                try:
                     await conn.execute(text("""
                         ALTER TABLE users 
                         ALTER COLUMN telegram_id TYPE BIGINT
                     """))
-                logger.info("Migration completed: telegram_id changed to BIGINT")
-            except Exception as migrate_error:
-                logger.warning(f"Migration warning (may already be applied): {migrate_error}")
+                    logger.info("Migration completed: telegram_id changed to BIGINT")
+                except Exception as migrate_error:
+                    # Если таблица не существует или другая ошибка - игнорируем
+                    logger.info(f"Migration skipped or applied: {migrate_error}")
+            
+            # Создаем все таблицы
+            await conn.run_sync(Base.metadata.create_all)
         
+        logger.info("Database tables created successfully")
         return True
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
