@@ -6,4 +6,3 @@ Pydantic==2.5.0
 FastAPI==0.104.1
 uvicorn==0.24.0
 aiofiles==23.2.1
-psycopg2-binary==2.9.9
