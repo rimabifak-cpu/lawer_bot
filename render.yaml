@@ -50,7 +50,7 @@ services:
     healthCheckPath: /api/test-db
 
 databases:
-  - name: law-bot-db
-    databaseName: law_bot_db
-    user: law_bot_user
+  - name: lawer-bot-db
+    databaseName: lawer_bot_db
+    user: lawer_bot_user
     plan: free
