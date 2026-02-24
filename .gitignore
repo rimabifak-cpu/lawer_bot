@@ -18,6 +18,9 @@ var/
 wheels/
 *.egg-info/
 .installed.cfg
+
+# GitHub Actions
+.github/workflows/
 *.egg
 
 # Virtual environments
