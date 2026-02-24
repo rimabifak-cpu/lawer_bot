@@ -1,7 +1,7 @@
 services:
   # Telegram Bot (Web Service с polling)
   - type: web
-    name: law-bot-worker
+    name: law-bot
     env: python
     region: frankfurt
     plan: free
