@@ -65,6 +65,10 @@ async def main():
         logger.error("Bot token invalid. Exiting...")
         return
 
+    # Отключаем webhook (чтобы избежать конфликтов)
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook deleted, starting polling...")
+
     # Запускаем HTTP сервер для Render
     await create_http_server()
 
