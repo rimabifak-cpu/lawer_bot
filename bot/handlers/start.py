@@ -25,6 +25,8 @@ from bot.keyboards.keyboards import (
     get_back_keyboard
 )
 
+from bot.handlers.case_messages import get_user_cases, format_cases_list
+
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
@@ -252,12 +254,12 @@ async def services_handler(message: Message) -> None:
 async def history_handler(message: Message) -> None:
     """Обработчик раздела 'История услуг'"""
     user_id = message.from_user.id
-    
+
     async with get_db() as db:
         # Находим пользователя
         result = await db.execute(select(User).filter(User.telegram_id == user_id))
         user = result.scalar_one_or_none()
-        
+
         if user:
             # Получаем историю заявок пользователя
             result = await db.execute(
@@ -266,7 +268,7 @@ async def history_handler(message: Message) -> None:
                 .order_by(ServiceRequest.created_at.desc())
             )
             requests = result.scalars().all()
-            
+
             if requests:
                 history_text = "<b>Ваша история заявок:</b>\n\n"
                 for req in requests:
@@ -274,7 +276,7 @@ async def history_handler(message: Message) -> None:
                     description = req.description[:50] if req.description else ''
                     if len(req.description or '') > 50:
                         description += '...'
-                    
+
                     history_text += (
                         f"• ID: {req.id}\n"
                         f"  Статус: {req.status}\n"
@@ -285,8 +287,76 @@ async def history_handler(message: Message) -> None:
                 history_text = "У вас пока нет заявок."
         else:
             history_history_text = "Ошибка: пользователь не найден в системе."
-    
+
     await message.answer(history_text, reply_markup=get_back_keyboard())
+
+
+@router.callback_query(F.data == "menu_history")
+async def menu_history_callback_handler(callback_query: CallbackQuery) -> None:
+    """Обработчик callback 'История услуг' из inline-меню"""
+    user_id = callback_query.from_user.id
+
+    async with get_db() as db:
+        result = await db.execute(select(User).filter(User.telegram_id == user_id))
+        user = result.scalar_one_or_none()
+
+        if user:
+            result = await db.execute(
+                select(ServiceRequest)
+                .filter(ServiceRequest.user_id == user.id)
+                .order_by(ServiceRequest.created_at.desc())
+            )
+            requests = result.scalars().all()
+
+            if requests:
+                history_text = "<b>Ваша история заявок:</b>\n\n"
+                for req in requests:
+                    created_at = req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else 'не указана'
+                    description = req.description[:50] if req.description else ''
+                    if len(req.description or '') > 50:
+                        description += '...'
+
+                    history_text += (
+                        f"• ID: {req.id}\n"
+                        f"  Статус: {req.status}\n"
+                        f"  Дата: {created_at}\n"
+                        f"  Описание: {description}\n\n"
+                    )
+            else:
+                history_text = "У вас пока нет заявок."
+        else:
+            history_text = "Ошибка: пользователь не найден в системе."
+
+    await callback_query.message.edit_text(history_text, reply_markup=get_partner_profile_keyboard())
+    await callback_query.answer()
+
+
+@router.callback_query(F.data == "menu_my_cases")
+async def menu_my_cases_callback_handler(callback_query: CallbackQuery, state) -> None:
+    """Обработчик callback 'Поддержка' из inline-меню"""
+    from aiogram.fsm.context import FSMContext
+    user_id = callback_query.from_user.id
+    logger.info(f"Пользователь {user_id} открыл раздел поддержки из inline-меню")
+
+    try:
+        async with get_db() as db:
+            cases = await get_user_cases(db, user_id)
+
+            text = "<b>💬 Переписка с администратором</b>\n\n"
+            text += format_cases_list(cases)
+            text += (
+                "💌 Вы можете написать сообщение администратору в любое время.\n\n"
+                "<b>Просто напишите текст вашего сообщения ниже, и оно будет отправлено администратору.</b>"
+            )
+
+            await state.clear()
+
+            await callback_query.message.answer(text, reply_markup=get_main_menu_keyboard())
+            await callback_query.answer()
+
+    except Exception as e:
+        logger.exception(f"Ошибка в обработчике поддержки для пользователя {user_id}: {e}")
+        await callback_query.message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
 
 
 @router.message(F.text == "👤 Партнёрский профиль")
