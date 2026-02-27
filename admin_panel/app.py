@@ -10,8 +10,8 @@ from typing import Optional, List, Dict, Any
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -43,6 +43,15 @@ app = FastAPI(
     description="Админ-панель для управления юридическим ботом",
     version="2.0.0"
 )
+
+# Глобальный обработчик исключений
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Необработанное исключение на {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Внутренняя ошибка сервера", "error": str(exc)}
+    )
 
 # Добавляем CORS middleware
 app.add_middleware(
@@ -216,35 +225,39 @@ async def js_test():
 @app.get("/api/requests")
 async def get_requests():
     """Получить список всех заявок"""
-    async with get_db() as db:
-        result = await db.execute(
-            select(CaseQuestionnaire)
-            .options(selectinload(CaseQuestionnaire.user))
-            .order_by(CaseQuestionnaire.created_at.desc())
-        )
-        requests = result.unique().scalars().all()
-        
-        return [{
-            "id": req.id,
-            "user_id": req.user_id,
-            "parties_info": req.parties_info,
-            "dispute_subject": req.dispute_subject,
-            "legal_basis": req.legal_basis,
-            "chronology": req.chronology,
-            "evidence": req.evidence,
-            "procedural_history": req.procedural_history,
-            "client_goal": req.client_goal,
-            "status": req.status,
-            "created_at": serialize_datetime(req.created_at),
-            "sent_at": serialize_datetime(req.sent_at),
-            "user": {
-                "id": req.user.id,
-                "telegram_id": req.user.telegram_id,
-                "username": req.user.username,
-                "first_name": req.user.first_name,
-                "last_name": req.user.last_name
-            } if req.user else None
-        } for req in requests]
+    try:
+        async with get_db() as db:
+            result = await db.execute(
+                select(CaseQuestionnaire)
+                .options(selectinload(CaseQuestionnaire.user))
+                .order_by(CaseQuestionnaire.created_at.desc())
+            )
+            requests = result.unique().scalars().all()
+
+            return [{
+                "id": req.id,
+                "user_id": req.user_id,
+                "parties_info": req.parties_info,
+                "dispute_subject": req.dispute_subject,
+                "legal_basis": req.legal_basis,
+                "chronology": req.chronology,
+                "evidence": req.evidence,
+                "procedural_history": req.procedural_history,
+                "client_goal": req.client_goal,
+                "status": req.status,
+                "created_at": serialize_datetime(req.created_at),
+                "sent_at": serialize_datetime(req.sent_at),
+                "user": {
+                    "id": req.user.id,
+                    "telegram_id": req.user.telegram_id,
+                    "username": req.user.username,
+                    "first_name": req.user.first_name,
+                    "last_name": req.user.last_name
+                } if req.user else None
+            } for req in requests]
+    except Exception as e:
+        logger.error(f"Ошибка в /api/requests: {e}", exc_info=True)
+        raise
 
 
 @app.put("/api/requests/{request_id}")
@@ -730,31 +743,35 @@ async def get_partner_referrer(telegram_id: int):
 @app.get("/api/users")
 async def get_users():
     """Получить список всех пользователей"""
-    async with get_db() as db:
-        result = await db.execute(
-            select(User).order_by(User.registered_at.desc())
-        )
-        users = result.scalars().all()
-        
-        users_data = []
-        for user in users:
-            profile_result = await db.execute(
-                select(PartnerProfile).filter(PartnerProfile.user_id == user.id)
+    try:
+        async with get_db() as db:
+            result = await db.execute(
+                select(User).order_by(User.registered_at.desc())
             )
-            profile = profile_result.scalar_one_or_none()
-            
-            users_data.append({
-                "id": user.id,
-                "telegram_id": user.telegram_id,
-                "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "is_partner": profile is not None,
-                "partner_name": profile.full_name if profile else None,
-                "registered_at": serialize_datetime(user.registered_at)
-            })
-        
-        return users_data
+            users = result.scalars().all()
+
+            users_data = []
+            for user in users:
+                profile_result = await db.execute(
+                    select(PartnerProfile).filter(PartnerProfile.user_id == user.id)
+                )
+                profile = profile_result.scalar_one_or_none()
+
+                users_data.append({
+                    "id": user.id,
+                    "telegram_id": user.telegram_id,
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "is_partner": profile is not None,
+                    "partner_name": profile.full_name if profile else None,
+                    "registered_at": serialize_datetime(user.registered_at)
+                })
+
+            return users_data
+    except Exception as e:
+        logger.error(f"Ошибка в /api/users: {e}", exc_info=True)
+        raise
 
 
 @app.get("/api/users/list")
@@ -1079,45 +1096,49 @@ async def send_direct_message(request: DirectMessageRequest):
 @app.get("/api/dialogs")
 async def get_dialogs():
     """Получить список всех диалогов"""
-    async with get_db() as db:
-        result = await db.execute(
-            select(CaseMessage)
-            .options(selectinload(CaseMessage.sender))
-            .order_by(CaseMessage.created_at.desc())
-        )
-        messages = result.unique().scalars().all()
-        
-        dialogs_dict = {}
-        for msg in messages:
-            user = msg.sender
-            if not user:
-                continue
-            
-            telegram_id = user.telegram_id
-            if telegram_id not in dialogs_dict:
-                display_name = (
-                    f"{user.first_name or ''} (@{user.username})" 
-                    if user.username else f"{user.first_name or 'Клиент'} (ID:{telegram_id})"
-                ).strip()
-                
-                dialogs_dict[telegram_id] = {
-                    "telegram_id": telegram_id,
-                    "display_name": display_name,
-                    "last_message": (
-                        msg.message_content[:50] + "..." 
-                        if len(msg.message_content) > 50 else msg.message_content
-                    ),
-                    "last_time": serialize_datetime(msg.created_at),
-                    "unread_count": 0
-                }
-            
-            if msg.sender_type == "client" and not msg.is_read:
-                dialogs_dict[telegram_id]["unread_count"] += 1
-        
-        dialogs = list(dialogs_dict.values())
-        dialogs.sort(key=lambda x: x["last_time"] or "", reverse=True)
-        
-        return dialogs
+    try:
+        async with get_db() as db:
+            result = await db.execute(
+                select(CaseMessage)
+                .options(selectinload(CaseMessage.sender))
+                .order_by(CaseMessage.created_at.desc())
+            )
+            messages = result.unique().scalars().all()
+
+            dialogs_dict = {}
+            for msg in messages:
+                user = msg.sender
+                if not user:
+                    continue
+
+                telegram_id = user.telegram_id
+                if telegram_id not in dialogs_dict:
+                    display_name = (
+                        f"{user.first_name or ''} (@{user.username})"
+                        if user.username else f"{user.first_name or 'Клиент'} (ID:{telegram_id})"
+                    ).strip()
+
+                    dialogs_dict[telegram_id] = {
+                        "telegram_id": telegram_id,
+                        "display_name": display_name,
+                        "last_message": (
+                            msg.message_content[:50] + "..."
+                            if len(msg.message_content) > 50 else msg.message_content
+                        ),
+                        "last_time": serialize_datetime(msg.created_at),
+                        "unread_count": 0
+                    }
+
+                if msg.sender_type == "client" and not msg.is_read:
+                    dialogs_dict[telegram_id]["unread_count"] += 1
+
+            dialogs = list(dialogs_dict.values())
+            dialogs.sort(key=lambda x: x["last_time"] or "", reverse=True)
+
+            return dialogs
+    except Exception as e:
+        logger.error(f"Ошибка в /api/dialogs: {e}", exc_info=True)
+        raise
 
 
 @app.get("/api/dialogs/{telegram_id}/messages")
