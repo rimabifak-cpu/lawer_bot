@@ -430,3 +430,40 @@ async def back_to_legal_services_handler(callback_query: CallbackQuery) -> None:
 def register_start_handlers(dp):
     """Регистрация обработчиков"""
     dp.include_router(router)
+
+@router.callback_query(F.data == "get_referral_link")
+async def get_referral_link_callback_handler(callback_query: CallbackQuery) -> None:
+    """Обработчик кнопки 'Получить реферальную ссылку' из уведомления"""
+    from sqlalchemy import select
+
+    user_id = callback_query.from_user.id
+
+    async with get_db() as db:
+        result = await db.execute(select(User).filter(User.telegram_id == user_id))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            await callback_query.answer("Пользователь не найден", show_alert=True)
+            return
+
+        result = await db.execute(
+            select(ReferralLink).filter(ReferralLink.partner_id == user.id)
+        )
+        referral_link = result.scalar_one_or_none()
+
+        if not referral_link:
+            import random
+            import string
+            referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            referral_link = ReferralLink(partner_id=user.id, referral_code=referral_code)
+            db.add(referral_link)
+            await db.commit()
+
+        bot_username = (await callback_query.bot.get_me()).username
+        link = f"https://t.me/{bot_username}?start={referral_link.referral_code}"
+
+        text = f"<b>🔗 Ваша реферальная ссылка</b>\n\nОтправьте друзьям:\n<code>{link}</code>\n\nЗа каждого приглашённого вы будете получать процент!"
+
+        await callback_query.message.answer(text, parse_mode="HTML")
+        await callback_query.answer()
+
