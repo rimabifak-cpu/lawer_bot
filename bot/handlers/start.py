@@ -358,6 +358,35 @@ async def profile_handler(message: Message) -> None:
     await message.answer(text, reply_markup=get_partner_profile_keyboard())
 
 
+@router.message(F.text == "✏️ Заполнить профиль")
+async def complete_profile_handler(message: Message) -> None:
+    """Обработчик кнопки 'Заполнить профиль'"""
+    text = (
+        "<b>✏️ Заполнение профиля партнёра</b>\n\n"
+        "Давайте создадим ваш профессиональный профиль. "
+        "Это поможет клиентам найти именно вас!\n\n"
+        "Заполнение займёт около 5 минут."
+    )
+    await message.answer(text, reply_markup=get_partner_profile_keyboard())
+    logger.info(f"Пользователь {message.from_user.id} начал заполнение профиля")
+
+
+@router.callback_query(F.data == "menu_complete_profile")
+async def menu_complete_profile_callback_handler(callback_query: CallbackQuery) -> None:
+    """Обработчик callback 'Заполнить профиль' из inline-меню"""
+    text = (
+        "<b>✏️ Заполнение профиля партнёра</b>\n\n"
+        "Давайте создадим ваш профессиональный профиль. "
+        "Это поможет клиентам найти именно вас!\n\n"
+        "Заполнение займёт около 5 минут."
+    )
+    await callback_query.message.edit_text(
+        text,
+        reply_markup=get_partner_profile_keyboard()
+    )
+    await callback_query.answer()
+
+
 @router.message(F.text == "❓ FAQ")
 async def faq_handler(message: Message) -> None:
     """Обработчик раздела 'FAQ'"""

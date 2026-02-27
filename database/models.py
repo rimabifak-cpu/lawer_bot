@@ -234,3 +234,16 @@ class CaseMessage(Base):
     # Relationships
     questionnaire = relationship("CaseQuestionnaire")
     sender = relationship("User")
+
+class NotificationLog(Base):
+    """Журнал отправленных уведомлений"""
+    __tablename__ = "notification_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    notification_type = Column(String(50))
+    attempt_number = Column(Integer)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    is_delivered = Column(Boolean, default=True)
+
+    user = relationship("User")
