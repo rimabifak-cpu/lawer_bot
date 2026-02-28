@@ -191,6 +191,86 @@ async def check_and_send_referral_notifications(bot):
         logger.error(f"Ошибка в check_and_send_referral_notifications: {e}")
 
 
+async def send_onboarding_notification(user: User, bot) -> bool:
+    """Отправить onboarding уведомление для первой сделки"""
+    try:
+        from bot.keyboards.keyboards import create_inline_keyboard
+
+        keyboard = create_inline_keyboard([("🔥 Показать инструкцию", "onboarding_instruction")])
+
+        await bot.send_message(
+            chat_id=user.telegram_id,
+            text=ONBOARDING_TEXT,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+
+        async with get_db() as db:
+            log = NotificationLog(
+                user_id=user.id,
+                notification_type="onboarding_first_deal",
+                attempt_number=1,
+                is_delivered=True
+            )
+            db.add(log)
+            await db.commit()
+
+        logger.info(f"Отправлено onboarding уведомление пользователю {user.telegram_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Ошибка отправки onboarding уведомления пользователю {user.telegram_id}: {e}")
+        return False
+
+
+async def check_and_send_onboarding_notifications(bot):
+    """Проверить пользователей и отправить onboarding уведомления 1-го числа"""
+    try:
+        from datetime import datetime
+        from sqlalchemy import and_
+
+        now = datetime.utcnow()
+
+        # Проверяем только 1-го числа
+        if now.day != 1:
+            logger.info(f"Сегодня {now.day}-е число, onboarding уведомления не отправляем")
+            return
+
+        async with get_db() as db:
+            # Находим пользователей зарегистрированных в прошлом месяце
+            last_month = now.month - 1 if now.month > 1 else 12
+            last_month_year = now.year if now.month > 1 else now.year - 1
+
+            from sqlalchemy import extract
+
+            result = await db.execute(
+                select(User)
+                .where(extract('month', User.registered_at) == last_month)
+                .where(extract('year', User.registered_at) == last_month_year)
+            )
+            users_last_month = result.scalars().all()
+
+            logger.info(f"Найдено {len(users_last_month)} пользователей зарегистрированных в прошлом месяце")
+
+            for user in users_last_month:
+                # Проверяем было ли уже отправлено onboarding уведомление
+                result = await db.execute(
+                    select(NotificationLog.id)
+                    .where(NotificationLog.user_id == user.id)
+                    .where(NotificationLog.notification_type == "onboarding_first_deal")
+                )
+                already_sent = result.scalar_one_or_none()
+
+                if already_sent:
+                    continue
+
+                # Отправляем уведомление
+                await send_onboarding_notification(user, bot)
+
+    except Exception as e:
+        logger.error(f"Ошибка в check_and_send_onboarding_notifications: {e}")
+
+
 async def main(notification_type: str = "all"):
     """Точка входа
 
@@ -217,6 +297,10 @@ async def main(notification_type: str = "all"):
         if notification_type in ("all", "referral"):
             await check_and_send_referral_notifications(bot)
             logger.info("Проверка реферальных уведомлений завершена")
+
+        if notification_type in ("all", "onboarding"):
+            await check_and_send_onboarding_notifications(bot)
+            logger.info("Проверка onboarding уведомлений завершена")
 
         logger.info("Все проверки завершены")
     finally:

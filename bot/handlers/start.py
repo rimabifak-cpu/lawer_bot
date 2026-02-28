@@ -467,3 +467,20 @@ async def get_referral_link_callback_handler(callback_query: CallbackQuery) -> N
         await callback_query.message.answer(text, parse_mode="HTML")
         await callback_query.answer()
 
+@router.callback_query(F.data == "onboarding_instruction")
+async def onboarding_instruction_handler(callback_query: CallbackQuery) -> None:
+    """Обработчик кнопки 'Показать инструкцию' из onboarding уведомления"""
+    text = (
+        "<b>🔥 Инструкция для повышенного процента</b>\n\n"
+        "Чтобы получить повышенный процент на все сделки:\n\n"
+        "1️⃣ Заполните профиль партнёра\n"
+        "2️⃣ Отправьте нам первую заявку на оценку дела\n"
+        "3️⃣ Получите вознаграждение по повышенной ставке\n\n"
+        "<b>Важно:</b> Успейте провести первую сделку до конца месяца!"
+    )
+
+    from bot.keyboards.keyboards import get_partner_profile_keyboard
+
+    await callback_query.message.answer(text, reply_markup=get_partner_profile_keyboard(), parse_mode="HTML")
+    await callback_query.answer()
+
