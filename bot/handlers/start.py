@@ -9,7 +9,7 @@ import logging
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import CommandStart
 
 from database.database import get_db
@@ -228,9 +228,13 @@ async def command_start_handler(message: Message) -> None:
             referral_code = command_parts[1]
             await process_referral(db, referral_code, user)
 
+    # Отправляем изображение
+    image = FSInputFile("C:\\Users\\HONOR\\Desktop\\Без имени-1.jpg")
+    await message.answer_photo(photo=image)
+
     # Отправляем приветствие
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
-    
+
     # Отправляем кнопку с инструкцией после приветствия
     await message.answer(
         "💡 Хотите узнать, как заработать с нами?\n\n"
