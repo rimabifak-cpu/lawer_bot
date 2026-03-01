@@ -115,6 +115,7 @@ def get_how_to_earn_keyboard() -> InlineKeyboardMarkup:
         ("💰 Как продать своим клиентам", "earn_sell_to_clients"),
         ("🔍 Как найти новых клиентов", "earn_find_new_clients"),
         ("💸 Пассивный доход", "earn_passive_income"),
+        ("🔥 Наши преимущества", "earn_advantages"),
         ("🔙 Назад", "back_to_main")
     ]
     return create_inline_keyboard(buttons, columns=1)
