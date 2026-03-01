@@ -229,7 +229,7 @@ async def command_start_handler(message: Message) -> None:
             await process_referral(db, referral_code, user)
 
     # Отправляем изображение
-    image = FSInputFile("C:\\Users\\HONOR\\Desktop\\Без имени-1.jpg")
+    image = FSInputFile("/app/uploads/start_image.jpg")
     await message.answer_photo(photo=image)
 
     # Отправляем приветствие
