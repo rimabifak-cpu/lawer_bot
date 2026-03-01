@@ -12,6 +12,7 @@ from bot.handlers.case_messages import register_case_messages_handlers
 from bot.handlers.faq import register_faq_handlers
 from bot.handlers.legal_services import register_legal_services_handlers
 from bot.handlers.service_details import register_service_detail_handlers
+from bot.handlers.how_to_earn import register_how_to_earn_handlers
 
 def register_handlers(dp):
     register_start_handlers(dp)
@@ -24,3 +25,4 @@ def register_handlers(dp):
     register_faq_handlers(dp)
     register_legal_services_handlers(dp)
     register_service_detail_handlers(dp)
+    register_how_to_earn_handlers(dp)

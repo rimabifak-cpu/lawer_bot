@@ -22,7 +22,8 @@ from bot.keyboards.keyboards import (
     get_legal_services_keyboard,
     get_partner_profile_keyboard,
     get_faq_categories_keyboard,
-    get_back_keyboard
+    get_back_keyboard,
+    get_how_to_earn_keyboard
 )
 
 from bot.handlers.case_messages import get_user_cases, format_cases_list
@@ -220,23 +221,30 @@ async def command_start_handler(message: Message) -> None:
     username = message.from_user.username
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
-    
+
     logger.info(f"Команда /start от пользователя {user_id}")
-    
+
     async with get_db() as db:
         # Создаем или получаем пользователя
         user = await get_or_create_user(
             db, user_id, username, first_name, last_name
         )
-        
+
         # Проверяем реферальный код
         command_parts = message.text.split(' ')
         if len(command_parts) > 1:
             referral_code = command_parts[1]
             await process_referral(db, referral_code, user)
-    
+
     # Отправляем приветствие
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
+    
+    # Отправляем кнопку с инструкцией после приветствия
+    await message.answer(
+        "💡 Хотите узнать, как заработать с нами?\n\n"
+        "Нажмите кнопку ниже, чтобы получить пошаговую инструкцию:",
+        reply_markup=get_how_to_earn_keyboard()
+    )
 
 
 @router.message(F.text == "📋 Услуги")
