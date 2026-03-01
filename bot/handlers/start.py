@@ -229,8 +229,11 @@ async def command_start_handler(message: Message) -> None:
             await process_referral(db, referral_code, user)
 
     # Отправляем изображение
-    image = FSInputFile("/app/uploads/start_image.jpg")
-    await message.answer_photo(photo=image)
+    try:
+        image = FSInputFile("/app/uploads/start_image.jpg")
+        await message.answer_photo(photo=image)
+    except Exception as e:
+        logger.error(f"Ошибка отправки изображения: {e}")
 
     # Отправляем приветствие
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
