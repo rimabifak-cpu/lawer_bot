@@ -1221,7 +1221,6 @@ async def send_dialog_message(telegram_id: int, request: DirectMessageRequest):
         else:
             # Дела нет — просто отправляем, не сохраняем
             logger.info(f"Дело не найдено для пользователя {telegram_id}")
-            await db.commit()
 
         notification_text = f"💬 <b>Ответ от ЮК</b>\n\n📝 {request.content}"
         await send_notification_to_client(
