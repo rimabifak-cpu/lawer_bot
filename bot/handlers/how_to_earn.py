@@ -116,14 +116,14 @@ async def how_to_earn_handler(callback_query: CallbackQuery) -> None:
         "<b>📖 Инструкция, как заработать</b>\n\n"
         "Выберите раздел, который вас интересует:"
     )
-    await callback_query.message.edit_text(text, reply_markup=get_how_to_earn_keyboard())
+    await callback_query.message.answer(text, reply_markup=get_how_to_earn_keyboard())
     await callback_query.answer()
 
 
 @router.callback_query(F.data == "earn_sell_to_clients")
 async def sell_to_clients_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Как продать своим клиентам'"""
-    await callback_query.message.edit_text(HOW_TO_SELL_TEXT, reply_markup=get_how_to_earn_keyboard())
+    await callback_query.message.answer(HOW_TO_SELL_TEXT, reply_markup=get_how_to_earn_keyboard())
     await callback_query.answer()
 
 
@@ -134,28 +134,28 @@ async def find_new_clients_handler(callback_query: CallbackQuery) -> None:
         "<b>🔍 Как найти новых клиентов</b>\n\n"
         "Выберите метод поиска:"
     )
-    await callback_query.message.edit_text(text, reply_markup=get_find_clients_keyboard())
+    await callback_query.message.answer(text, reply_markup=get_find_clients_keyboard())
     await callback_query.answer()
 
 
 @router.callback_query(F.data == "earn_cold_outreach")
 async def cold_outreach_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Холодные обращения'"""
-    await callback_query.message.edit_text(HOW_TO_FIND_COLD_TEXT, reply_markup=get_find_clients_keyboard())
+    await callback_query.message.answer(HOW_TO_FIND_COLD_TEXT, reply_markup=get_find_clients_keyboard())
     await callback_query.answer()
 
 
 @router.callback_query(F.data == "earn_advertising")
 async def advertising_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Реклама'"""
-    await callback_query.message.edit_text(HOW_TO_ADVERTISE_TEXT, reply_markup=get_find_clients_keyboard())
+    await callback_query.message.answer(HOW_TO_ADVERTISE_TEXT, reply_markup=get_find_clients_keyboard())
     await callback_query.answer()
 
 
 @router.callback_query(F.data == "earn_passive_income")
 async def passive_income_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Пассивный доход'"""
-    await callback_query.message.edit_text(HOW_TO_PASSIVE_TEXT, reply_markup=get_how_to_earn_keyboard())
+    await callback_query.message.answer(HOW_TO_PASSIVE_TEXT, reply_markup=get_how_to_earn_keyboard())
     await callback_query.answer()
 
 
