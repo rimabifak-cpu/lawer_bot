@@ -79,7 +79,6 @@ def create_service_keyboard(
 
 MAIN_MENU_BUTTONS = [
     "📋 Услуги",
-    "✏️ Заполнить профиль",
     "👤 Партнёрский профиль",
     "💼 Отправить дело на оценку",
     "❓ FAQ",
@@ -96,7 +95,6 @@ def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
     """Inline-версия главного меню для использования с edit_text"""
     buttons = [
         ("📋 Услуги", "menu_services"),
-        ("✏️ Заполнить профиль", "menu_complete_profile"),
         ("👤 Партнёрский профиль", "menu_profile"),
         ("💼 Отправить дело на оценку", "menu_send_case"),
         ("❓ FAQ", "menu_faq"),
