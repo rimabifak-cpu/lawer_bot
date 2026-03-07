@@ -112,6 +112,9 @@ async def main():
     await create_http_server()
 
     logger.info("Starting bot polling...")
+    logger.info("✅ Отложенные уведомления включены:")
+    logger.info("   • Через 1 час: специальное предложение со скидкой 15%")
+    logger.info("   • Через 24 часа: результаты заработка партнёров")
     try:
         await dp.start_polling(bot)
     except Exception as e:

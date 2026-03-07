@@ -211,6 +211,7 @@ async def process_referral(
 async def command_start_handler(message: Message) -> None:
     """
     Обработчик команды /start
+    Планирует отправку промо-сообщения через 1 час для новых пользователей
     """
     user_id = message.from_user.id
     username = message.from_user.username
@@ -220,6 +221,12 @@ async def command_start_handler(message: Message) -> None:
     logger.info(f"Команда /start от пользователя {user_id}")
 
     async with get_db() as db:
+        # Проверяем, существует ли пользователь
+        result = await db.execute(select(User).filter(User.telegram_id == user_id))
+        existing_user = result.scalar_one_or_none()
+        
+        is_new_user = existing_user is None
+        
         # Создаем или получаем пользователя
         user = await get_or_create_user(
             db, user_id, username, first_name, last_name
@@ -230,6 +237,22 @@ async def command_start_handler(message: Message) -> None:
         if len(command_parts) > 1:
             referral_code = command_parts[1]
             await process_referral(db, referral_code, user)
+        
+        # Если пользователь новый - планируем отправку уведомлений
+        if is_new_user:
+            from bot.utils.delayed_notification import (
+                schedule_promo_notification,
+                schedule_earnings_notification
+            )
+            from bot import main as bot_module
+            
+            # Планируем первое уведомление через 1 час
+            await schedule_promo_notification(bot_module.bot, user_id, delay_hours=1)
+            logger.info(f"📅 Промо-сообщение запланировано для нового пользователя {user_id}")
+            
+            # Планируем второе уведомление через 24 часа
+            await schedule_earnings_notification(bot_module.bot, user_id, delay_hours=24)
+            logger.info(f"📅 Уведомление о результатах запланировано для нового пользователя {user_id}")
 
     # Отправляем изображение
     try:

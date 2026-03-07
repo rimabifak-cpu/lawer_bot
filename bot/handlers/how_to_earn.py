@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
+from aiogram.fsm.context import FSMContext
 
 from bot.keyboards.keyboards import (
     get_how_to_earn_keyboard,
@@ -16,6 +17,7 @@ from bot.keyboards.keyboards import (
     get_back_keyboard,
     get_main_menu_keyboard
 )
+from bot.states.states import RevenueStates
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +248,67 @@ async def how_to_earn_message_handler(message: Message) -> None:
         "@legaldecision, поддержка 24/7"
     )
     await message.answer(text, reply_markup=get_how_to_earn_keyboard())
+
+
+# ============================================
+# Обработчик для "Отправьте это и получите ₽₽₽"
+# ============================================
+
+MESSAGE_TEMPLATE = (
+    "{name}, добрый день!\n\n"
+    "Последний год искал юридическую компанию в партнеры — хороших юристов найти сложно. "
+    "Но недавно мне это удалось: я стал партнером Профессиональной юридической компании.\n\n"
+    "Благодаря этому сотрудничеству, я могу подключать к решению ваших задач с хорошими скидками.\n\n"
+    "Готов на ближайшем деле показать уровень сервиса и экспертизы, чтобы дальше вы принимали "
+    "решение уже по полученному результату.\n\n"
+    "Скажите, планируются ли у вас в ближайшее время запросы к юристам?"
+)
+
+
+@router.callback_query(F.data == "earn_send_message")
+async def send_message_handler(callback_query: CallbackQuery, state: FSMContext) -> None:
+    """Обработчик кнопки 'Отправьте это и получите ₽₽₽'"""
+    text = (
+        "Мы выверили сообщение, которое дает максимальную конверсию! 💰\n\n"
+        "Введите <b>Имя получателя</b>, и если вы девушка — измените окончания, пример: «искал» на «искала»:\n\n"
+        "<i>Пример: Александр / Александра</i>"
+    )
+    await callback_query.message.answer(text, parse_mode="HTML")
+    await state.set_state(RevenueStates.waiting_for_recipient_name)
+    await callback_query.answer()
+
+
+@router.message(RevenueStates.waiting_for_recipient_name)
+async def process_recipient_name(message: Message, state: FSMContext) -> None:
+    """Обработка имени получателя"""
+    recipient_name = message.text.strip()
+    
+    # Сохраняем имя в состоянии
+    await state.update_data(recipient_name=recipient_name)
+    
+    # Генерируем сообщение с именем
+    generated_message = MESSAGE_TEMPLATE.format(name=recipient_name)
+    
+    # Отправляем сообщение для копирования
+    await message.answer(
+        f"<b>Ваше сообщение для отправки:</b>\n\n{generated_message}",
+        parse_mode="HTML"
+    )
+    
+    # Отправляем сообщение в отдельном блоке для удобного копирования
+    await message.answer(
+        f"<code>{generated_message}</code>",
+        parse_mode="HTML"
+    )
+    
+    await message.answer(
+        "📋 Нажмите на сообщение выше, чтобы скопировать его, и отправьте вашему клиенту!\n\n"
+        "Удачи в продажах! 💰",
+        reply_markup=get_main_menu_keyboard()
+    )
+    
+    # Очищаем состояние
+    await state.clear()
 
 
 def register_how_to_earn_handlers(dp):

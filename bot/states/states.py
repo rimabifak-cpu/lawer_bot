@@ -41,3 +41,4 @@ class RevenueStates(StatesGroup):
     """Состояния для добавления выручки"""
     waiting_for_amount = State()
     waiting_for_description = State()
+    waiting_for_recipient_name = State()  # Состояние для имени получателя сообщения
