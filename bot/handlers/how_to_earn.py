@@ -270,8 +270,7 @@ async def send_message_handler(callback_query: CallbackQuery, state: FSMContext)
     """Обработчик кнопки 'Отправьте это и получите ₽₽₽'"""
     text = (
         "Мы выверили сообщение, которое дает максимальную конверсию! 💰\n\n"
-        "Введите <b>Имя получателя</b>, и если вы девушка — измените окончания, пример: «искал» на «искала»:\n\n"
-        "<i>Пример: Александр / Александра</i>"
+        "Введите <b>Имя получателя</b>, к примеру Александр Сергеевич и мы вам вышлем готовое сообщение с лучшей конверсией в продажу"
     )
     await callback_query.message.answer(text, parse_mode="HTML")
     await state.set_state(RevenueStates.waiting_for_recipient_name)
