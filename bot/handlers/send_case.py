@@ -179,13 +179,15 @@ async def send_case_start_handler(message: Message, state: FSMContext) -> None:
         "documents_list": []
     }
     await state.update_data(initial_data)
-    
+
     # Отправляем сообщение о вознаграждении
     await message.answer(
         "После оценки задания мы сообщим точную сумму вашего вознаграждения.\n"
-        "Если вы сможете продать результат дороже этой суммы — разница полностью остаётся вам."
+        "Если вы сможете продать результат дороже этой суммы — разница полностью остаётся вам.\n\n"
+        "  \n\n"
+        "@legaldecision, поддержка 24/7"
     )
-    
+
     # Показываем первый вопрос
     await show_step_question(message, state, 1)
 

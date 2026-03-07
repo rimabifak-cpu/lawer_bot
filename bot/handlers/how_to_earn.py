@@ -175,7 +175,9 @@ async def how_to_earn_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Инструкция, как заработать'"""
     text = (
         "<b>📖 Инструкция, как заработать</b>\n\n"
-        "Выберите раздел, который вас интересует:"
+        "Выберите раздел, который вас интересует:\n\n"
+        "  \n\n"
+        "@legaldecision, поддержка 24/7"
     )
     await callback_query.message.answer(text, reply_markup=get_how_to_earn_keyboard())
     await callback_query.answer()
@@ -239,7 +241,9 @@ async def how_to_earn_message_handler(message: Message) -> None:
     """Обработчик текстовой кнопки 'Инструкция, как заработать'"""
     text = (
         "<b>📖 Инструкция, как заработать</b>\n\n"
-        "Выберите раздел, который вас интересует:"
+        "Выберите раздел, который вас интересует:\n\n"
+        "  \n\n"
+        "@legaldecision, поддержка 24/7"
     )
     await message.answer(text, reply_markup=get_how_to_earn_keyboard())
 

@@ -141,8 +141,8 @@ async def faq_main_handler(message: Message) -> None:
     """
     Обработчик FAQ из главного меню - показывает категории
     """
-    text = "<b>Выберите категорию вопросов:</b>"
-    
+    text = "<b>Выберите категорию вопросов:</b>\n\n  \n\n@legaldecision, поддержка 24/7"
+
     from bot.keyboards.keyboards import get_faq_categories_keyboard
     await message.answer(text, reply_markup=get_faq_categories_keyboard())
 
@@ -162,7 +162,7 @@ async def faq_category_handler(callback_query: CallbackQuery) -> None:
     # Если это просто выбор категории, показываем кнопки с вопросами
     if category_key == "faq_main_menu":
         # Возвращаемся к списку категорий
-        text = "<b>Выберите категорию вопросов:</b>"
+        text = "<b>Выберите категорию вопросов:</b>\n\n  \n\n@legaldecision, поддержка 24/7"
         from bot.keyboards.keyboards import get_faq_categories_keyboard
         await callback_query.message.edit_text(text, reply_markup=get_faq_categories_keyboard())
         await callback_query.answer()

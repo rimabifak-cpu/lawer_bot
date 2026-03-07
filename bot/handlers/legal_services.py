@@ -135,7 +135,9 @@ async def back_to_legal_services_handler(callback_query: CallbackQuery) -> None:
     text = (
         "<b>Наши услуги:</b>\n\n"
         "Мы предлагаем широкий спектр юридических услуг для вашего бизнеса. "
-        "Выберите интересующую вас категорию услуг:"
+        "Выберите интересующую вас категорию услуг:\n\n"
+        "  \n\n"
+        "@legaldecision, поддержка 24/7"
     )
     await callback_query.message.edit_text(
         text,
