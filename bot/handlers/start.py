@@ -285,23 +285,28 @@ async def command_start_handler(message: Message) -> None:
         logger.error(f"Ошибка отправки изображения: {e}")
 
     # Отправляем приветствие
+    logger.info(f"Отправка приветствия пользователю {user_id}")
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
 
     # Небольшая задержка перед следующим сообщением
     await asyncio.sleep(0.3)
 
     # Отправляем информацию о процентах дохода (третье сообщение)
+    logger.info(f"Отправка процентов дохода пользователю {user_id}")
     await message.answer(REVENUE_PERCENT_TEXT, parse_mode="HTML")
 
     # Небольшая задержка перед следующим сообщением
     await asyncio.sleep(0.3)
 
     # Отправляем кнопку с инструкцией после приветствия
+    logger.info(f"Отправка кнопки инструкции пользователю {user_id}")
     await message.answer(
         "💡 Хотите узнать, как заработать с нами?\n\n"
         "Нажмите кнопку ниже, чтобы получить пошаговую инструкцию:",
         reply_markup=get_how_to_earn_keyboard()
     )
+    
+    logger.info(f"Все сообщения отправлены пользователю {user_id}")
 
 
 @router.message(F.text == "📋 Услуги")

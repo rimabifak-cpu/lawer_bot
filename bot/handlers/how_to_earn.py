@@ -175,6 +175,7 @@ OBJECTIONS_TEXT = (
 @router.callback_query(F.data == "menu_how_to_earn")
 async def how_to_earn_handler(callback_query: CallbackQuery) -> None:
     """Обработчик кнопки 'Инструкция, как заработать'"""
+    logger.info(f"Пользователь {callback_query.from_user.id} нажал кнопку 'Инструкция, как заработать'")
     text = (
         "<b>📖 Инструкция, как заработать</b>\n\n"
         "Выберите раздел, который вас интересует:\n\n"
