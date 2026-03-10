@@ -285,28 +285,38 @@ async def command_start_handler(message: Message) -> None:
         logger.error(f"Ошибка отправки изображения: {e}")
 
     # Отправляем приветствие
-    logger.info(f"Отправка приветствия пользователю {user_id}")
-    await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
+    try:
+        logger.info(f"Отправка приветствия пользователю {user_id}")
+        await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
+        logger.info(f"Приветствие отправлено пользователю {user_id}")
+    except Exception as e:
+        logger.error(f"Ошибка отправки приветствия: {e}")
 
-    # Небольшая задержка перед следующим сообщением
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.5)
 
     # Отправляем информацию о процентах дохода (третье сообщение)
-    logger.info(f"Отправка процентов дохода пользователю {user_id}")
-    await message.answer(REVENUE_PERCENT_TEXT, parse_mode="HTML")
+    try:
+        logger.info(f"Отправка процентов дохода пользователю {user_id}")
+        await message.answer(REVENUE_PERCENT_TEXT, parse_mode="HTML")
+        logger.info(f"Проценты дохода отправлены пользователю {user_id}")
+    except Exception as e:
+        logger.error(f"Ошибка отправки процентов дохода: {e}")
 
-    # Небольшая задержка перед следующим сообщением
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.5)
 
     # Отправляем кнопку с инструкцией после приветствия
-    logger.info(f"Отправка кнопки инструкции пользователю {user_id}")
-    await message.answer(
-        "💡 Хотите узнать, как заработать с нами?\n\n"
-        "Нажмите кнопку ниже, чтобы получить пошаговую инструкцию:",
-        reply_markup=get_how_to_earn_keyboard()
-    )
+    try:
+        logger.info(f"Отправка кнопки инструкции пользователю {user_id}")
+        await message.answer(
+            "💡 Хотите узнать, как заработать с нами?\n\n"
+            "Нажмите кнопку ниже, чтобы получить пошаговую инструкцию:",
+            reply_markup=get_how_to_earn_keyboard()
+        )
+        logger.info(f"Кнопка инструкции отправлена пользователю {user_id}")
+    except Exception as e:
+        logger.error(f"Ошибка отправки кнопки инструкции: {e}")
     
-    logger.info(f"Все сообщения отправлены пользователю {user_id}")
+    logger.info(f"✅ Все сообщения отправлены пользователю {user_id}")
 
 
 @router.message(F.text == "📋 Услуги")
