@@ -5,6 +5,7 @@
 import sys
 import os
 import logging
+import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -278,11 +279,20 @@ async def command_start_handler(message: Message) -> None:
     except Exception as e:
         logger.error(f"Ошибка отправки изображения: {e}")
 
+    # Небольшая задержка перед следующим сообщением
+    await asyncio.sleep(0.5)
+
     # Отправляем приветствие
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
 
+    # Небольшая задержка перед следующим сообщением
+    await asyncio.sleep(0.5)
+
     # Отправляем информацию о процентах дохода (третье сообщение)
     await message.answer(REVENUE_PERCENT_TEXT, parse_mode="HTML")
+
+    # Небольшая задержка перед следующим сообщением
+    await asyncio.sleep(0.5)
 
     # Отправляем кнопку с инструкцией после приветствия
     await message.answer(
