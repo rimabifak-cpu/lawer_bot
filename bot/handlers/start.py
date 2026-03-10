@@ -286,7 +286,7 @@ async def command_start_handler(message: Message) -> None:
     # Отправляем приветствие
     try:
         logger.info(f"Отправка приветствия пользователю {user_id}")
-        await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
+        await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard(), parse_mode=None)
         logger.info(f"Приветствие отправлено пользователю {user_id}")
     except Exception as e:
         logger.error(f"Ошибка отправки приветствия: {e}")
@@ -296,7 +296,7 @@ async def command_start_handler(message: Message) -> None:
     # Отправляем информацию о процентах дохода (третье сообщение)
     try:
         logger.info(f"Отправка процентов дохода пользователю {user_id}")
-        await message.answer(REVENUE_PERCENT_TEXT)
+        await message.answer(REVENUE_PERCENT_TEXT, parse_mode=None)
         logger.info(f"Проценты дохода отправлены пользователю {user_id}")
     except Exception as e:
         logger.error(f"Ошибка отправки процентов дохода: {e}")
