@@ -272,27 +272,29 @@ async def command_start_handler(message: Message) -> None:
             await schedule_earnings_notification(bot_module.bot, user_id, delay_hours=24)
             logger.info(f"📅 Уведомление о результатах запланировано для нового пользователя {user_id}")
 
-    # Отправляем изображение
+    # Отправляем изображение (если файл существует)
     try:
-        image = FSInputFile("/app/uploads/start_image.jpg")
-        await message.answer_photo(photo=image)
+        image_path = "/app/uploads/start_image.jpg"
+        if os.path.exists(image_path):
+            image = FSInputFile(image_path)
+            await message.answer_photo(photo=image)
+            await asyncio.sleep(0.3)
+        else:
+            logger.warning(f"Файл изображения не найден: {image_path}")
     except Exception as e:
         logger.error(f"Ошибка отправки изображения: {e}")
-
-    # Небольшая задержка перед следующим сообщением
-    await asyncio.sleep(0.5)
 
     # Отправляем приветствие
     await message.answer(WELCOME_TEXT, reply_markup=get_main_menu_keyboard())
 
     # Небольшая задержка перед следующим сообщением
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.3)
 
     # Отправляем информацию о процентах дохода (третье сообщение)
     await message.answer(REVENUE_PERCENT_TEXT, parse_mode="HTML")
 
     # Небольшая задержка перед следующим сообщением
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.3)
 
     # Отправляем кнопку с инструкцией после приветствия
     await message.answer(
